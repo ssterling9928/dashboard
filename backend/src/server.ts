@@ -1,6 +1,10 @@
 import 'dotenv/config'
 import express from "express";
 import cors from "cors";
+import { synoRequest } from './lib/synology.js'
+import servicesRouter from "./routes/services.js"
+import metricsRouter from "./routes/metrics.js"
+import logsRouter from "./routes/logs.js"
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -12,12 +16,36 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/services", (_req, res) => {
-  res.json([
-    { id: "plex", name: "Plex", status: "healthy" },
-    { id: "grafana", name: "Grafana", status: "healthy" }
-  ]);
-});
+app.use('/api/services', servicesRouter)
+app.use('/api/metrics', metricsRouter)
+app.use('/api/logs', logsRouter)
+
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error(err.stack)
+  res.status(500).json({ error: err.message })
+})
+
+app.get('/api/debug/apis', async (_req, res) => {
+  try {
+    const data = await synoRequest('SYNO.API.Info', 'query', 1, {
+      query: 'Log',
+    })
+    res.json(data)
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/debug/apis2', async (_req, res) => {
+  try {
+    const data = await synoRequest('SYNO.API.Info', 'query', 1, {
+      query: 'all',
+    })
+    res.json(data)
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 app.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
