@@ -1,21 +1,22 @@
+
 import { Router } from 'express'
 import { synoRequest } from '../lib/synology.js'
-import type { Service, ServiceDetail } from '../types/index.js'
+import type { Service, ServiceDetail } from '../../../shared/types.'
 
 const router = Router()
 
-// Helper — convert Synology container status to our status type
-function parseStatus(state: string): Service['status'] {
+// ── Helpers ───────────────────────────────────────────────
+
+function parseStatus(state: string): string {
   switch (state?.toLowerCase()) {
     case 'running': return 'running'
-    case 'exited':
+    case 'exited':  return 'exited'
     case 'stopped': return 'stopped'
     case 'paused':  return 'paused'
     default:        return 'unknown'
   }
 }
 
-// Helper — calculate uptime from an ISO start timestamp
 function formatUptime(startedAt: string): string {
   if (!startedAt || startedAt.startsWith('0001')) return 'N/A'
   const seconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
@@ -28,10 +29,9 @@ function formatUptime(startedAt: string): string {
   return `${m}m`
 }
 
-// 
+// ── GET /api/services ─────────────────────────────────────
 router.get('/', async (_req, res, next) => {
   try {
-    // Step 1: get the container list
     const listData = await synoRequest('SYNO.Docker.Container', 'list', 1, {
       limit:  '100',
       offset: '0',
@@ -39,32 +39,28 @@ router.get('/', async (_req, res, next) => {
 
     const containers: any[] = listData.containers ?? []
 
-    // Step 2: fetch details for all containers in parallel
     const detailResults = await Promise.allSettled(
       containers.map(c =>
         synoRequest('SYNO.Docker.Container', 'get', 1, { name: c.name })
       )
     )
 
-    
     const services: Service[] = containers.map((c, i) => {
-  const result = detailResults[i]
-  const detail = result?.status === 'fulfilled' ? result.value : null
+      const result    = detailResults[i]
+      const detail    = result?.status === 'fulfilled' ? result.value : null
+      const startedAt = detail?.details?.State?.StartedAt ?? ''
 
-  const startedAt = detail?.details?.State?.StartedAt ?? ''
-
-  return {
-    id:            c.name,
-    name:          c.name,
-    status:        parseStatus(c.status),
-    health:        c.status === 'running' ? 'healthy' : 'unhealthy',
-    image:         c.image,
-    uptime:        formatUptime(startedAt),
-    restarts:      detail?.details?.RestartCount ?? c.restart_count ?? 0,
-    containerName: c.name,
-    containerId:   c.id,
-  }
-})
+      return {
+        id:          c.name,
+        name:        c.name,
+        description: c.image?.split(':')[0] ?? '',
+        version:     c.image?.split(':')[1] ?? 'latest',
+        status:      parseStatus(c.status),
+        restarts:    detail?.details?.RestartCount ?? c.restart_count ?? 0,
+        uptime:      formatUptime(startedAt),
+        type:        'container',
+      }
+    })
 
     res.json(services)
   } catch (err) {
@@ -72,12 +68,10 @@ router.get('/', async (_req, res, next) => {
   }
 })
 
+// ── GET /api/services/:id ─────────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
-    const data = await synoRequest('SYNO.Docker.Container', 'get', 1, {
-      name: req.params.id,
-    })
-
+    const data    = await synoRequest('SYNO.Docker.Container', 'get', 1, { name: req.params.id })
     const details = data.details
     const profile = data.profile
 
@@ -86,23 +80,26 @@ router.get('/:id', async (req, res, next) => {
     )
 
     const detail: ServiceDetail = {
-      id:            profile.name,
-      name:          profile.name,
-      status:        parseStatus(details.State?.Status ?? ''),
-      health:        details.State?.Running ? 'healthy' : 'unhealthy',
+      // Base Service fields
+      id:          profile.name,
+      name:        profile.name,
+      description: profile.image?.split(':')[0] ?? '',
+      version:     profile.image?.split(':')[1] ?? 'latest',
+      status:      parseStatus(details.State?.Status ?? ''),
+      restarts:    details.RestartCount ?? 0,
+      uptime:      formatUptime(details.State?.StartedAt ?? ''),
+      type:        'container',
+
+      // Detail-only fields
       image:         profile.image,
-      uptime:        formatUptime(details.State?.StartedAt ?? ''),
-      restarts:      details.RestartCount ?? 0,
-      containerName: profile.name,
       containerId:   profile.id,
+      containerName: profile.name,
+      restartPolicy: details.HostConfig?.RestartPolicy?.Name ?? 'none',
+      internalIp:    details.NetworkSettings?.IPAddress,
       ports,
-      internalIp:    details.NetworkSettings?.IPAddress || profile.network_mode || 'N/A',
       started:       details.State?.StartedAt
                        ? new Date(details.State.StartedAt).toLocaleString()
                        : 'N/A',
-      restartPolicy: profile.HostConfig?.RestartPolicy?.Name
-                       ?? details.HostConfig?.RestartPolicy?.Name
-                       ?? 'none',
     }
 
     res.json(detail)
@@ -111,22 +108,11 @@ router.get('/:id', async (req, res, next) => {
   }
 })
 
-// ── POST /api/services/:id/restart ────────────────────────
-router.post('/:id/restart', async (req, res, next) => {
+// ── POST /api/services/:id/start ──────────────────────────
+router.post('/:id/start', async (req, res, next) => {
   try {
-    // Stop first
-    await synoRequest('SYNO.Docker.Container', 'stop', 1, {
-      name: req.params.id,
-    })
-
-    // Wait 2 seconds then start
-    await new Promise(r => setTimeout(r, 2000))
-
-    await synoRequest('SYNO.Docker.Container', 'start', 1, {
-      name: req.params.id,
-    })
-
-    res.json({ ok: true, message: `${req.params.id} restarted successfully` })
+    await synoRequest('SYNO.Docker.Container', 'start', 1, { name: req.params.id })
+    res.json({ ok: true, message: `${req.params.id} started` })
   } catch (err) {
     next(err)
   }
@@ -135,22 +121,20 @@ router.post('/:id/restart', async (req, res, next) => {
 // ── POST /api/services/:id/stop ───────────────────────────
 router.post('/:id/stop', async (req, res, next) => {
   try {
-    await synoRequest('SYNO.Docker.Container', 'stop', 1, {
-      name: req.params.id,
-    })
+    await synoRequest('SYNO.Docker.Container', 'stop', 1, { name: req.params.id })
     res.json({ ok: true, message: `${req.params.id} stopped` })
   } catch (err) {
     next(err)
   }
 })
 
-// ── POST /api/services/:id/start ──────────────────────────
-router.post('/:id/start', async (req, res, next) => {
+// ── POST /api/services/:id/restart ───────────────────────
+router.post('/:id/restart', async (req, res, next) => {
   try {
-    await synoRequest('SYNO.Docker.Container', 'start', 1, {
-      name: req.params.id,
-    })
-    res.json({ ok: true, message: `${req.params.id} started` })
+    await synoRequest('SYNO.Docker.Container', 'stop', 1, { name: req.params.id })
+    await new Promise(r => setTimeout(r, 2000))
+    await synoRequest('SYNO.Docker.Container', 'start', 1, { name: req.params.id })
+    res.json({ ok: true, message: `${req.params.id} restarted` })
   } catch (err) {
     next(err)
   }
