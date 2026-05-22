@@ -1,8 +1,7 @@
 
 import { Router } from 'express'
 import { synoRequest } from '../lib/synology.js'
-import type { Service, ServiceDetail } from '../../../shared/types.'
-
+import type { Service, ServiceDetail } from '../types/index.js'
 const router = Router()
 
 // ── Helpers ───────────────────────────────────────────────
@@ -108,6 +107,16 @@ router.get('/:id', async (req, res, next) => {
   }
 })
 
+// GET /api/services/:id/inspect
+router.get('/:id/inspect', async (req, res, next) => {
+  try {
+    const data = await synoRequest('SYNO.Docker.Container', 'get', 1, { name: req.params.id })
+    res.json(data)
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ── POST /api/services/:id/start ──────────────────────────
 router.post('/:id/start', async (req, res, next) => {
   try {
@@ -139,5 +148,7 @@ router.post('/:id/restart', async (req, res, next) => {
     next(err)
   }
 })
+
+
 
 export default router
