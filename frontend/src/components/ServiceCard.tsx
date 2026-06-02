@@ -1,8 +1,7 @@
-// src/components/ServiceCard.tsx
+
 import HealthBadge from './HealthBadge'
 import type { Service } from '@shared/types'
-import dockerIcon from '../assets/docker.svg'
-import appIcon    from '../assets/app.svg'
+import dockerIcon from '../assets/docker.png'
 
 interface Props {
   service:   Service

@@ -1,10 +1,10 @@
-// src/components/ServiceDetailsModal.tsx
+
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ServiceDetail } from '@shared/types'
 import { fetchService, containerAction } from '../api/Services'
 import HealthBadge from './HealthBadge'
-import dockerIcon from '../assets/docker.svg'
+import dockerIcon from '../assets/docker.png'
 
 interface Props {
   serviceId: string | null
