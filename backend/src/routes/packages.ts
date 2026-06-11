@@ -2,7 +2,7 @@
 
 import { Router } from 'express'
 import { synoRequest } from '../lib/synology.js'
-import type { Package, PackageDetail } from '../types/index.js'
+import type { Package, PackageDetail } from '../types/types.js'
 
 const router = Router()
 
@@ -18,10 +18,9 @@ function parsePackageStatus(status: string): string {
 // ── GET /api/packages ─────────────────────────────────────
 router.get('/', async (_req, res, next) => {
   try {
-    const data = await synoRequest('SYNO.Core.Package', 'list', 1, {
-      additional: '["description","thumbnail","author","install_type"]',
-      offset: '0',
-      limit: '100',
+    const data = await synoRequest('SYNO.Core.Package', 'list', 2, {
+      additional: '"description","description_enu","dependent_packages","beta","distributor","distributor_url","maintainer","maintainer_url","dsm_apps","dsm_app_page","dsm_app_launch_name","report_beta_url","support_center","startable","installed_info","support_url","is_uninstall_pages","install_type","autoupdate","silent_upgrade","installing_progress","ctl_uninstall","updated_at","status","url","available_operation","install_type"',
+      list: 'all'
     })
 
     const packages: Package[] = (data.packages ?? []).map((p: any) => ({

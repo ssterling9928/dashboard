@@ -1,7 +1,7 @@
 
 import { Router } from 'express'
 import { synoRequest } from '../lib/synology.js'
-import type { Service, ServiceDetail } from '../types/index.js'
+import type { Service, ServiceDetail } from '../types/types.js'
 const router = Router()
 
 // ── Helpers ───────────────────────────────────────────────
@@ -47,17 +47,15 @@ router.get('/', async (_req, res, next) => {
     const services: Service[] = containers.map((c, i) => {
       const result    = detailResults[i]
       const detail    = result?.status === 'fulfilled' ? result.value : null
-      const startedAt = detail?.details?.State?.StartedAt ?? ''
+      const startedAt = detail?.details?.State?.StartedAt
 
       return {
-        id:          c.name,
-        name:        c.name,
-        description: c.image?.split(':')[0] ?? '',
-        version:     c.image?.split(':')[1] ?? 'latest',
-        status:      parseStatus(c.status),
-        restarts:    detail?.details?.RestartCount ?? c.restart_count ?? 0,
-        uptime:      formatUptime(startedAt),
-        type:        'container',
+        ServiceId:   c.name,
+        Name:        c.name,
+        Version:     c.image?.split(':')[1] ?? 'unknown',
+        Status:      parseStatus(c.status),
+        Uptime:      formatUptime(startedAt),
+        Type:        'container',
       }
     })
 
@@ -71,34 +69,31 @@ router.get('/', async (_req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const data    = await synoRequest('SYNO.Docker.Container', 'get', 1, { name: req.params.id })
+    const Url     = await synoRequest('SYNO.Core.AppPortal.ReverseProxy', 'list', 1)
     const details = data.details
     const profile = data.profile
 
-    const ports = (profile.port_bindings ?? []).map((p: any) =>
+    const Ports = (profile.port_bindings ?? []).map((p: any) =>
       `${p.host_port}:${p.container_port}/${p.type ?? 'tcp'}`
     )
 
     const detail: ServiceDetail = {
-      // Base Service fields
-      id:          profile.name,
-      name:        profile.name,
-      description: profile.image?.split(':')[0] ?? '',
-      version:     profile.image?.split(':')[1] ?? 'latest',
-      status:      parseStatus(details.State?.Status ?? ''),
-      restarts:    details.RestartCount ?? 0,
-      uptime:      formatUptime(details.State?.StartedAt ?? ''),
-      type:        'container',
+      
+      ServiceId:        profile.name,
+      Name:             profile.name,
+      Version:          profile.image?.split(':')[1] ?? 'latest',
+      Status:           parseStatus(details.State?.Status ?? ''),
+      Uptime:           formatUptime(details.State?.StartedAt ?? ''),
+      Type:             'container',
 
-      // Detail-only fields
-      image:         profile.image,
-      containerId:   profile.id,
-      containerName: profile.name,
-      restartPolicy: details.HostConfig?.RestartPolicy?.Name ?? 'none',
-      internalIp:    details.NetworkSettings?.IPAddress,
-      ports,
-      started:       details.State?.StartedAt
-                       ? new Date(details.State.StartedAt).toLocaleString()
-                       : 'N/A',
+      ImageId:          profile.image,
+      ContainerId:      profile.id,
+      RestartPolicy:    details.HostConfig?.RestartPolicy?.Name ?? 'none',
+      Ports,
+      Url,              // Still need to update URL using API
+      Started:          details.State?.StartedAt,
+      Restarts:         details.RestartCount,
+      Networks:         Object.keys(details.NetworkSettings.Networks)
     }
 
     res.json(detail)

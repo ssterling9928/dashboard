@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { synoRequest } from '../lib/synology.js'
-import type { LogEntry } from '../../../shared/types/index.js'
+import type { LogEntry } from '../types/types.js'
 
 const router = Router()
 

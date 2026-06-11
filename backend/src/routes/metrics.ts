@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { snmpGet, snmpWalk, OIDs } from '../lib/snmp.js'
-import type { MetricSummary, MetricPoint } from '../../../shared/types/index.js'
+import type { MetricSummary, MetricPoint } from '../types/types.js'
 
 const router = Router()
 

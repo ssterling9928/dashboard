@@ -1,24 +1,23 @@
 
 // ── Docker Container ──────────────────────────────────────
 export interface Service {
-  id:          string
-  name:        string
-  description: string
-  version:     string
-  status:      string
-  restarts:    number
-  uptime:      string
-  type:        'container'
+  ServiceId:   string
+  Name:        string
+  Version:     string
+  Status:      string
+  Uptime:      string
+  Type:        'container'
 }
 
 export interface ServiceDetail extends Service {
-  image:         string
-  containerId:   string
-  containerName: string
-  restartPolicy: string
-  internalIp:    string
-  ports:         string[]
-  started:       string
+  ImageId:       string
+  ContainerId:   string
+  RestartPolicy: string
+  Ports:         string[]
+  Started:       string
+  Restarts:      string
+  Url:           string
+  Networks:      string[]
 }
 
 // ── Synology Package ──────────────────────────────────────
