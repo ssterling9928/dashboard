@@ -16,7 +16,8 @@ export interface ServiceDetail extends Service {
   Ports:         string[]
   Started:       string
   Restarts:      string
-  Url:           string
+  PublicUrl:     string
+  InternalUrl:   string
   Networks:      string[]
 }
 

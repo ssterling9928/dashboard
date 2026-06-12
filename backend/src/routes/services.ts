@@ -31,19 +31,24 @@ function formatUptime(startedAt: string): string {
 // ── GET /api/services ─────────────────────────────────────
 router.get('/', async (_req, res, next) => {
   try {
+
+    // GET API DATA - set variable
     const listData = await synoRequest('SYNO.Docker.Container', 'list', 1, {
       limit:  '100',
       offset: '0',
     })
 
+    // Map all containers to object
     const containers: any[] = listData.containers ?? []
 
+    // Get detailed information for each container
     const detailResults = await Promise.allSettled(
       containers.map(c =>
         synoRequest('SYNO.Docker.Container', 'get', 1, { name: c.name })
       )
     )
 
+    // Return all API info
     const services: Service[] = containers.map((c, i) => {
       const result    = detailResults[i]
       const detail    = result?.status === 'fulfilled' ? result.value : null
@@ -68,15 +73,31 @@ router.get('/', async (_req, res, next) => {
 // ── GET /api/services/:id ─────────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
+
+    // GET API INFO - set variables 
     const data    = await synoRequest('SYNO.Docker.Container', 'get', 1, { name: req.params.id })
-    const Url     = await synoRequest('SYNO.Core.AppPortal.ReverseProxy', 'list', 1)
+    const UrlAPI  = await synoRequest('SYNO.Core.AppPortal.ReverseProxy', 'list', 1)
     const details = data.details
     const profile = data.profile
 
+    // Map port info to object
     const Ports = (profile.port_bindings ?? []).map((p: any) =>
       `${p.host_port}:${p.container_port}/${p.type ?? 'tcp'}`
     )
 
+    // Match services with description names - to get public hostnames
+    const URLmatch = UrlAPI.entries.find((e: any) =>
+      e.description.toLowerCase() === profile.name.toLowerCase()
+    )
+
+    // Format datetime started
+    const startedInfo = details.State?.StartedAt
+    const formattedStart = new Date(startedInfo).toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).replace(',', '')
+
+    // Return all API info
     const detail: ServiceDetail = {
       
       ServiceId:        profile.name,
@@ -86,12 +107,15 @@ router.get('/:id', async (req, res, next) => {
       Uptime:           formatUptime(details.State?.StartedAt ?? ''),
       Type:             'container',
 
-      ImageId:          profile.image,
+      ImageId:          details.Image,
       ContainerId:      profile.id,
       RestartPolicy:    details.HostConfig?.RestartPolicy?.Name ?? 'none',
       Ports,
-      Url,              // Still need to update URL using API
-      Started:          details.State?.StartedAt,
+      PublicUrl:        URLmatch ? `https://${URLmatch.frontend.fqdn}` : "null",
+
+      // same as PublicURL - just puts .internal on end instead (All my services are configured this way)
+      InternalUrl:      URLmatch ? `https://${URLmatch.frontend.fqdn.split('.')[0]}.internal` : "null",
+      Started:          formattedStart,
       Restarts:         details.RestartCount,
       Networks:         Object.keys(details.NetworkSettings.Networks)
     }
