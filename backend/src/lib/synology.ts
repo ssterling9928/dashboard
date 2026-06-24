@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import { fetch, Agent } from 'undici'
+import type { SynoParams } from "./../types/types.js"
 
 const BASE = process.env.SYNO_HOST!
 const USER = process.env.SYNO_USER!
@@ -55,7 +56,7 @@ export async function synoRequest(
   api: string,
   method: string,
   version: number,
-  extra: Record<string, string> = {}
+  extra: SynoParams = {}
 ): Promise<any> {
   const sess = await getSession()
 
@@ -65,8 +66,11 @@ export async function synoRequest(
   url.searchParams.set('method', method)
   url.searchParams.set('_sid', sess.sid)
 
-  for (const [k, v] of Object.entries(extra)) {
-    url.searchParams.set(k, v)
+  for (const [key, value] of Object.entries(extra)) {
+    url.searchParams.set(
+      key,
+      Array.isArray(value) ? value.join(',') : String(value)
+    )
   }
 
   const res = await fetch(url.toString(), {

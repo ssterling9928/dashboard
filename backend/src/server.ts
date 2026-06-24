@@ -27,21 +27,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: err.message })
 })
 
-app.get('/api/debug/apis', async (_req, res) => {
+app.get('/api/debug', async (_req, res) => {
   try {
     const data = await synoRequest('SYNO.API.Info', 'query', 1, {
-      query: 'all',
-    })
-    res.json(data)
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.get('/api/debug/apis2', async (_req, res) => {
-  try {
-    const data = await synoRequest('SYNO.Core.Package', 'list', 1, {
-      list: 'all',
+      query: 'all'
     })
     res.json(data)
   } catch (err: any) {
