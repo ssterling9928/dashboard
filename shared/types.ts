@@ -25,18 +25,15 @@ export interface ServiceDetail extends Service {
 export interface Package {
   id:          string
   name:        string
-  description: string
   version:     string
-  status:      string
   type:        'package'
 }
 
 export interface PackageDetail extends Package {
-  author:      string
   installPath: string
   size:        string
-  thumbnail:   string
-  dsmApps:     string[]
+  description: string 
+  status:      string 
 }
 
 
@@ -61,3 +58,5 @@ export interface LogEntry {
   source: string
   message: string
 }
+
+export type SynoParams = Record<string, string | number | boolean | string[]>
