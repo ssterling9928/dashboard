@@ -6,42 +6,74 @@ const router = Router()
 
 // In-memory ring buffer — stores last 288 readings (24hrs at 5min intervals)
 const BUFFER_SIZE = 288
+const DEFAULT_VOLUME = '/volume1'
+
 const history: Record<string, MetricPoint[]> = {
-  cpu:     [],
-  memory:  [],
+  cpu: [],
+  memory: [],
   network: [],
-  disk:    [],
 }
 
-// Seed timestamps for history points
-function timeLabel(offsetMinutes: number): string {
-  const d = new Date(Date.now() - offsetMinutes * 60 * 1000)
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+const diskHistory: Record<string, MetricPoint[]> = {}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
 }
 
-function pushReading(type: string, value: number) {
-  const buf = history[type]
-  if (!buf) return
-  buf.push({ time: timeLabel(0), value: Math.round(value) })
+function pushReading(buf: MetricPoint[], value: number) {
+  buf.push({
+    time: new Date().toISOString(),
+    value: Math.round(clampPercent(value)),
+  })
+
   if (buf.length > BUFFER_SIZE) buf.shift()
 }
 
-// Filter history by range (hours)
-function getRange(type: string, hours: number): MetricPoint[] {
-  if (!history[type]) return []
-  const points = Math.min(hours * 12, history[type].length) 
-  return history[type].slice(-points)
+function getMetricHistory(type: string): MetricPoint[] {
+  return history[type] ?? []
 }
 
-function summarize(type: string, hours: number): MetricSummary {
-  const pts = getRange(type, hours)
+function getDiskHistory(volume: string): MetricPoint[] {
+  if (!diskHistory[volume]) {
+    diskHistory[volume] = []
+  }
+  return diskHistory[volume]
+}
+
+function getRange(points: MetricPoint[], hours: number): MetricPoint[] {
+  const safeHours = Math.max(1, Math.min(24, hours))
+  const count = Math.min(safeHours * 12, points.length)
+  return points.slice(-count)
+}
+
+function summarizePoints(points: MetricPoint[], hours: number): MetricSummary {
+  const pts = getRange(points, hours)
   const values = pts.map(p => p.value)
+
   const current = values[values.length - 1] ?? 0
   const average = values.length
     ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
     : 0
   const peak = values.length ? Math.max(...values) : 0
-  return { current, average, peak, unit: '%', history: pts }
+
+  return {
+    current,
+    average,
+    peak,
+    unit: '%',
+    history: pts,
+  }
+}
+
+function oidIndex(oid: string): string {
+  return oid.split('.').pop() ?? ''
+}
+
+function normalizeVolumeParam(input: unknown): string {
+  const raw = String(input ?? 'volume1').trim()
+  if (!raw) return DEFAULT_VOLUME
+  return raw.startsWith('/') ? raw : `/${raw}`
 }
 
 // Poll NAS every 5 minutes
@@ -53,24 +85,60 @@ async function pollMetrics() {
       OIDs.cpuIdle,
       OIDs.memTotal,
       OIDs.memAvailable,
+      OIDs.memBuffer,
+      OIDs.memCached,
     ])
 
-    const cpuUsed = 100 - Number(vals[OIDs.cpuIdle])
-    pushReading('cpu', cpuUsed)
+    // CPU — ssCpuIdle is idle percentage over the last minute
+    const cpuIdle = Number(vals[OIDs.cpuIdle] ?? 0)
+    const cpuUsed = 100 - cpuIdle
+    pushReading(getMetricHistory('cpu'), cpuUsed)
 
-    const memTotal = Number(vals[OIDs.memTotal])
-    const memAvail = Number(vals[OIDs.memAvailable])
-    const memUsed  = memTotal > 0 ? ((memTotal - memAvail) / memTotal) * 100 : 0
-    pushReading('memory', memUsed)
+    // Memory — DSM-style available memory = free + buffer + cached
+    const memTotal = Number(vals[OIDs.memTotal] ?? 0)
+    const memFree = Number(vals[OIDs.memAvailable] ?? 0)
+    const memBuffer = Number(vals[OIDs.memBuffer] ?? 0)
+    const memCached = Number(vals[OIDs.memCached] ?? 0)
 
-    // Disk — walk volume usage
-    const volUsed  = await snmpWalk(OIDs.volumeUsed)
-    const volTotal = await snmpWalk(OIDs.volumeTotal)
-    if (volTotal[0] && volUsed[0]) {
-      const diskPct = (Number(volUsed[0].value) / Number(volTotal[0].value)) * 100
-      pushReading('disk', diskPct)
+    const memAvailableDsm = memFree + memBuffer + memCached
+    const memUsed = memTotal > 0
+      ? ((memTotal - Math.min(memAvailableDsm, memTotal)) / memTotal) * 100
+      : 0
+
+    pushReading(getMetricHistory('memory'), memUsed)
+
+    // Disk — poll all /volumeN entries and store each separately
+    const [volNames, volTotal, volUsed] = await Promise.all([
+      snmpWalk(OIDs.volumeName),
+      snmpWalk(OIDs.volumeTotal),
+      snmpWalk(OIDs.volumeUsed),
+    ])
+
+    const nameMap = new Map(volNames.map(row => [oidIndex(row.oid), String(row.value)]))
+    const totalMap = new Map(volTotal.map(row => [oidIndex(row.oid), Number(row.value)]))
+    const usedMap = new Map(volUsed.map(row => [oidIndex(row.oid), Number(row.value)]))
+
+    const volumes = [...nameMap.keys()].map(index => ({
+      index,
+      name: nameMap.get(index) ?? '',
+      total: totalMap.get(index) ?? 0,
+      used: usedMap.get(index) ?? 0,
+    }))
+
+    const mountedVolumes = volumes.filter(v =>
+      /^\/volume\d+$/i.test(v.name) && v.total > 0
+    )
+
+    for (const volume of mountedVolumes) {
+      const diskPct = (volume.used / volume.total) * 100
+      pushReading(getDiskHistory(volume.name), diskPct)
     }
 
+    // Network placeholder until delta-based utilization is implemented
+    const networkBuf = getMetricHistory('network')
+    if (networkBuf.length === 0) {
+      pushReading(networkBuf, 0)
+    }
   } catch (err) {
     console.error('SNMP poll error:', err)
   }
@@ -80,18 +148,28 @@ async function pollMetrics() {
 pollMetrics()
 setInterval(pollMetrics, 5 * 60 * 1000)
 
-// ── GET /api/metrics?type=cpu&range=24 ────────────────────
+// GET /api/metrics?type=cpu&range=24
+// GET /api/metrics?type=disk&range=24&volume=volume1
 router.get('/', async (req, res, next) => {
   try {
-    const type  = (req.query.type  as string) ?? 'cpu'
-    const range = parseInt((req.query.range as string) ?? '24', 10)
+    const type = String(req.query.type ?? 'cpu')
+    const range = parseInt(String(req.query.range ?? '24'), 10) || 24
+
+    if (type === 'disk') {
+      const volume = normalizeVolumeParam(req.query.volume)
+      const points = getDiskHistory(volume)
+
+      return res.json({
+        volume,
+        ...summarizePoints(points, range),
+      })
+    }
 
     if (!history[type]) {
       return res.status(400).json({ error: `Unknown metric type: ${type}` })
     }
 
-    const summary = summarize(type, range)
-    res.json(summary)
+    return res.json(summarizePoints(getMetricHistory(type), range))
   } catch (err) {
     next(err)
   }
