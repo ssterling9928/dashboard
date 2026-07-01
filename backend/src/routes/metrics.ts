@@ -16,6 +16,14 @@ const history: Record<string, MetricPoint[]> = {
 
 const diskHistory: Record<string, MetricPoint[]> = {}
 
+interface NetSnapshot {
+  inBytes: number
+  outBytes: number
+  timestamp: number
+}
+
+let netSnapshot: NetSnapshot | null = null
+
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.min(100, value))
@@ -26,7 +34,14 @@ function pushReading(buf: MetricPoint[], value: number) {
     time: new Date().toISOString(),
     value: Math.round(clampPercent(value)),
   })
+  if (buf.length > BUFFER_SIZE) buf.shift()
+}
 
+function pushRawReading(buf: MetricPoint[], value: number) {
+  buf.push({
+    time: new Date().toISOString(),
+    value: Number.isFinite(value) ? Math.round(value * 100) / 100 : 0,
+  })
   if (buf.length > BUFFER_SIZE) buf.shift()
 }
 
@@ -47,23 +62,20 @@ function getRange(points: MetricPoint[], hours: number): MetricPoint[] {
   return points.slice(-count)
 }
 
-function summarizePoints(points: MetricPoint[], hours: number): MetricSummary {
+function summarizePoints(points: MetricPoint[], hours: number, unit = '%'): MetricSummary {
   const pts = getRange(points, hours)
   const values = pts.map(p => p.value)
+  const round = unit === '%'
+    ? (n: number) => Math.round(n)
+    : (n: number) => Math.round(n * 100) / 100
 
   const current = values[values.length - 1] ?? 0
   const average = values.length
-    ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+    ? round(values.reduce((a, b) => a + b, 0) / values.length)
     : 0
-  const peak = values.length ? Math.max(...values) : 0
+  const peak = values.length ? round(Math.max(...values)) : 0
 
-  return {
-    current,
-    average,
-    peak,
-    unit: '%',
-    history: pts,
-  }
+  return { current, average, peak, unit, history: pts }
 }
 
 function oidIndex(oid: string): string {
@@ -134,10 +146,36 @@ async function pollMetrics() {
       pushReading(getDiskHistory(volume.name), diskPct)
     }
 
-    // Network placeholder until delta-based utilization is implemented
-    const networkBuf = getMetricHistory('network')
-    if (networkBuf.length === 0) {
-      pushReading(networkBuf, 0)
+    // Network — delta-based MB/s for eth0
+    const [ifNames, ifIn, ifOut] = await Promise.all([
+      snmpWalk(OIDs.netIfName),
+      snmpWalk(OIDs.netInBytes),
+      snmpWalk(OIDs.netOutBytes),
+    ])
+
+    const ifNameMap = new Map(ifNames.map(r => [oidIndex(r.oid), String(r.value)]))
+    const ifInMap   = new Map(ifIn.map(r => [oidIndex(r.oid), Number(r.value)]))
+    const ifOutMap  = new Map(ifOut.map(r => [oidIndex(r.oid), Number(r.value)]))
+
+    const eth0Index = [...ifNameMap.entries()].find(([, name]) => name === 'eth0')?.[0]
+
+    if (eth0Index !== undefined) {
+      const inBytes  = ifInMap.get(eth0Index) ?? 0
+      const outBytes = ifOutMap.get(eth0Index) ?? 0
+      const now      = Date.now()
+
+      if (netSnapshot) {
+        const elapsedSec = (now - netSnapshot.timestamp) / 1000
+        const deltaIn    = inBytes - netSnapshot.inBytes
+        const deltaOut   = outBytes - netSnapshot.outBytes
+
+        if (elapsedSec > 0 && deltaIn >= 0 && deltaOut >= 0) {
+          const totalMBs = ((deltaIn + deltaOut) / elapsedSec) / (1024 * 1024)
+          pushRawReading(getMetricHistory('network'), totalMBs)
+        }
+      }
+
+      netSnapshot = { inBytes, outBytes, timestamp: now }
     }
   } catch (err) {
     console.error('SNMP poll error:', err)
@@ -146,7 +184,7 @@ async function pollMetrics() {
 
 // Start polling immediately then every 5 mins
 pollMetrics()
-setInterval(pollMetrics, 5 * 60 * 1000)
+setInterval(pollMetrics, 30 * 1000)
 
 // GET /api/metrics?type=cpu&range=24
 // GET /api/metrics?type=disk&range=24&volume=volume1
@@ -169,7 +207,8 @@ router.get('/', async (req, res, next) => {
       return res.status(400).json({ error: `Unknown metric type: ${type}` })
     }
 
-    return res.json(summarizePoints(getMetricHistory(type), range))
+    const unit = type === 'network' ? 'MB/s' : '%'
+    return res.json(summarizePoints(getMetricHistory(type), range, unit))
   } catch (err) {
     next(err)
   }

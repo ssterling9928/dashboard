@@ -22,20 +22,20 @@ app.use('/api/metrics', metricsRouter)
 app.use('/api/logs', logsRouter)
 app.use('/api/packages', packagesRouter)
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err.stack)
-  res.status(500).json({ error: err.message })
-})
-
-app.get('/api/debug', async (_req, res) => {
+app.get('/api/debug', async (_req, res, next) => {
   try {
     const data = await synoRequest('SYNO.API.Info', 'query', 1, {
       query: 'all'
     })
     res.json(data)
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    next(err)
   }
+})
+
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error(err.stack)
+  res.status(500).json({ error: err.message })
 })
 
 app.listen(PORT, () => {

@@ -56,7 +56,8 @@ export async function synoRequest(
   api: string,
   method: string,
   version: number,
-  extra: SynoParams = {}
+  extra: SynoParams = {},
+  retried = false
 ): Promise<any> {
   const sess = await getSession()
 
@@ -82,8 +83,9 @@ export async function synoRequest(
 
   // Session expired — re-login once and retry
   if (!data.success && data.error?.code === 119) {
+    if (retried) throw new Error('Synology session could not be refreshed')
     session = null
-    return synoRequest(api, method, version, extra)
+    return synoRequest(api, method, version, extra, true)
   }
 
   if (!data.success) {

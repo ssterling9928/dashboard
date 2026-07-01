@@ -15,9 +15,9 @@ export interface ServiceDetail extends Service {
   RestartPolicy: string
   Ports:         string[]
   Started:       string
-  Restarts:      string
-  PublicUrl:     string
-  InternalUrl:   string
+  Restarts:      number
+  PublicUrl:     string | null
+  InternalUrl:   string | null
   Networks:      string[]
 }
 

@@ -6,8 +6,6 @@ const router = Router()
 const SYNO_HELPER_URL =
   process.env.SYNO_HELPER_URL?.replace(/\/+$/, '') ?? 'http://YOUR_NAS_IP:4111'
 
-const PORT = process.env.SYNO_HELPER_PORT
-
 async function getJson<T>(url: string): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 10000)
