@@ -111,10 +111,10 @@ router.get('/:id', async (req, res, next) => {
       ContainerId:      profile.id,
       RestartPolicy:    details.HostConfig?.RestartPolicy?.Name ?? 'none',
       Ports,
-      PublicUrl:        URLmatch ? `https://${URLmatch.frontend.fqdn}` : "null",
+      PublicUrl:        URLmatch ? `https://${URLmatch.frontend.fqdn}` : null,
 
       // same as PublicURL - just puts .internal on end instead (All my services are configured this way)
-      InternalUrl:      URLmatch ? `https://${URLmatch.frontend.fqdn.split('.')[0]}.internal` : "null",
+      InternalUrl:      URLmatch ? `https://${URLmatch.frontend.fqdn.split('.')[0]}.internal` : null,
       Started:          formattedStart,
       Restarts:         details.RestartCount,
       Networks:         Object.keys(details.NetworkSettings.Networks)

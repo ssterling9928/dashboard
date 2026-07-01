@@ -50,8 +50,18 @@ function createSession() {
   })
 }
 
-function normalizeValue(value: unknown): number | string {
-  if (value instanceof Buffer) return value.toString()
+function normalizeValue(value: unknown, type?: number): number | string {
+  if (value instanceof Buffer) {
+    // Counter64 is returned as an 8-byte big-endian Buffer — read it as a number
+    if (type === snmp.ObjectType.Counter64) {
+      let n = 0
+      for (let i = 0; i < value.length; i++) {
+        n = n * 256 + value[i]
+      }
+      return Number.isFinite(n) ? n : 0
+    }
+    return value.toString()
+  }
 
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : String(value)
@@ -79,7 +89,7 @@ export async function snmpGet(oids: string[]): Promise<Record<string, number | s
         if (snmp.isVarbindError(vb)) {
           result[vb.oid] = 0
         } else {
-          result[vb.oid] = normalizeValue(vb.value)
+          result[vb.oid] = normalizeValue(vb.value, vb.type)
         }
       }
 
@@ -101,7 +111,7 @@ export async function snmpWalk(oid: string): Promise<{ oid: string; value: numbe
           if (!snmp.isVarbindError(vb)) {
             results.push({
               oid: vb.oid,
-              value: normalizeValue(vb.value),
+              value: normalizeValue(vb.value, vb.type),
             })
           }
         }
