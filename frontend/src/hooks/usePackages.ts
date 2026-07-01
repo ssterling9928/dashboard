@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { Package, PackageDetail } from '@shared/types'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API = import.meta.env.VITE_API_URL || '/proxy/4000'
 
 export function usePackages() {
   return useQuery<Package[]>({
