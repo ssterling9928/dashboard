@@ -11,7 +11,7 @@ interface Props {
   onClose:   () => void
 }
 
-function DetailRow({ label, value }: { label: string; value: string | number | undefined }) {
+function DetailRow({ label, value }: { label: string; value: string | number | null }) {
   return (
     <div className="flex justify-between py-1.5 text-sm">
       <span className="text-gray-500">{label}:</span>
@@ -128,11 +128,11 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
   }
 
   const grafanaUrl = service
-    ? `${import.meta.env.VITE_GRAFANA_URL}/explore?left={"queries":[{"expr":"{container_name=\\"${service.containerName}\\"}"}]}`
+    ? `${import.meta.env.VITE_GRAFANA_URL}/explore?left={"queries":[{"expr":"{container_name=\\"${service.Name}\\"}"}]}`
     : '#'
 
-  const appUrl = service?.ports?.length
-    ? `http://${window.location.hostname}:${service.ports[0]?.split(':')[0]}`
+  const appUrl = service?.Ports?.length
+    ? `http://${window.location.hostname}:${service.Ports[0]?.split(':')[0]}`
     : '#'
 
   return (
@@ -158,15 +158,14 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
             <div className="flex items-start justify-between p-6 border-b border-gray-100">
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                  <img src={dockerIcon} alt={service.name} className="w-7 h-7" />
+                  <img src={dockerIcon} alt={service.Name} className="w-7 h-7" />
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-gray-900">{service.name}</h2>
-                    <HealthBadge status={service.status} />
+                    <h2 className="text-xl font-bold text-gray-900">{service.Name}</h2>
+                    <HealthBadge status={service.Status} />
                   </div>
-                  <span className="text-sm text-gray-500">{service.version}</span>
-                  <span className="text-sm text-gray-400">{service.description}</span>
+                  <span className="text-sm text-gray-500">{service.Version}</span>
                 </div>
               </div>
               <button
@@ -183,27 +182,26 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
 
               {/* Overview */}
               <Section title="Overview">
-                <DetailRow label="Container Name" value={service.containerName} />
-                <DetailRow label="Status"         value={service.status} />
-                <DetailRow label="Health"         value={service.status} />
-                <DetailRow label="Image"          value={service.image} />
-                <DetailRow label="Container ID"   value={service.containerId?.slice(0, 12)} />
+                <DetailRow label="Container Name" value={service.Name} />
+                <DetailRow label="Status"         value={service.Status} />
+                <DetailRow label="Image"          value={service.ImageId} />
+                <DetailRow label="Container ID"   value={service.ContainerId.slice(0, 12)} />
               </Section>
 
               {/* Network */}
               <Section title="Network">
                 <DetailRow label="Public Hostname" value={window.location.hostname} />
-                <DetailRow label="Internal IP"     value={service.internalIp} />
-                <DetailRow label="Ports"           value={service.ports?.join(', ') || 'None'} />
+                <DetailRow label="Internal Url"    value={service.InternalUrl} />
+                <DetailRow label="Ports"           value={service.Ports?.join(', ') || 'None'} />
                 <DetailRow label="URL"             value={appUrl !== '#' ? appUrl : '—'} />
               </Section>
 
               {/* Runtime */}
               <Section title="Runtime">
-                <DetailRow label="Started"        value={service.started} />
-                <DetailRow label="Uptime"         value={service.uptime} />
-                <DetailRow label="Restart Count"  value={service.restarts} />
-                <DetailRow label="Restart Policy" value={service.restartPolicy} />
+                <DetailRow label="Started"        value={service.Started} />
+                <DetailRow label="Uptime"         value={service.Uptime} />
+                <DetailRow label="Restart Count"  value={service.Restarts} />
+                <DetailRow label="Restart Policy" value={service.RestartPolicy} />
               </Section>
 
               {/* Tools */}
@@ -230,7 +228,7 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
                   <ToolButton
                     label="Inspect Container"
                     buttonText="Inspect"
-                    href={`/api/services/${service.id}/inspect`}
+                    href={`/api/services/${service.ServiceId}/inspect`}
                     variant="gray"
                   />
                 </div>

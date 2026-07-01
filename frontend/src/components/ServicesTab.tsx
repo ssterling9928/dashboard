@@ -12,9 +12,9 @@ export default function ServicesTab({ services, onSelectService }: Props) {
     <div className="grid grid-cols-2 gap-4">
       {services.map((service) => (
         <ServiceCard
-          key={service.id}
+          key={service.ServiceId}
           service={service}
-          onDetails={() => onSelectService(service.id)}
+          onDetails={() => onSelectService(service.ServiceId)}
         />
       ))}
     </div>

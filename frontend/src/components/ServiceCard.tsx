@@ -20,7 +20,7 @@ export default function ServiceCard({ service, onDetails }: Props) {
           <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
             <img
               src={dockerIcon}
-              alt={service.name}
+              alt={service.Name}
               className="w-7 h-7"
             />
           </div>
@@ -28,33 +28,26 @@ export default function ServiceCard({ service, onDetails }: Props) {
           {/* Text */}
           <div className="flex flex-col">
             <span className="text-lg font-bold text-gray-900 leading-tight">
-              {service.name}
+              {service.Name}
             </span>
             <span className="text-sm text-gray-500">
-              {service.version}
-            </span>
-            <span className="text-sm text-gray-400">
-              {service.description}
+              {service.Version}
             </span>
           </div>
         </div>
 
-        <HealthBadge status={service.status} />
+        <HealthBadge status={service.Status} />
       </div>
 
       {/* Detail Rows */}
       <div className="flex flex-col divide-y divide-gray-100">
         <div className="flex justify-between py-2 text-sm">
           <span className="text-gray-500 font-medium">Status</span>
-          <span className="text-gray-800 font-semibold capitalize">{service.status}</span>
+          <span className="text-gray-800 font-semibold capitalize">{service.Status}</span>
         </div>
         <div className="flex justify-between py-2 text-sm">
           <span className="text-gray-500 font-medium">Uptime</span>
-          <span className="text-gray-800 font-semibold">{service.uptime}</span>
-        </div>
-        <div className="flex justify-between py-2 text-sm">
-          <span className="text-gray-500 font-medium">Restarts</span>
-          <span className="text-gray-800 font-semibold">{service.restarts}</span>
+          <span className="text-gray-800 font-semibold">{service.Uptime}</span>
         </div>
       </div>
 

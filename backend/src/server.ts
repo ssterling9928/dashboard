@@ -10,6 +10,17 @@ import packagesRouter from "./routes/packages.js"
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// The code-server proxy forwards requests to this port with the
+// "/proxy/<port>" prefix left on the path (mirrors frontend/vite.config.ts),
+// so strip it before Express routes the request.
+const PROXY_PREFIX = `/proxy/${PORT}`
+app.use((req, _res, next) => {
+  if (req.url === PROXY_PREFIX || req.url.startsWith(`${PROXY_PREFIX}/`)) {
+    req.url = req.url.slice(PROXY_PREFIX.length) || '/'
+  }
+  next()
+})
+
 app.use(cors());
 app.use(express.json());
 

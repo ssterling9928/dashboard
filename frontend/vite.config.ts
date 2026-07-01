@@ -2,6 +2,7 @@
 import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 const BASE = '/proxy/5173'
 
@@ -9,6 +10,7 @@ export default defineConfig({
   base: BASE + '/',
   plugins: [
     react(),
+    tailwindcss(),
     {
       name: 'strip-base',
       apply: 'serve',           // dev server only, not build

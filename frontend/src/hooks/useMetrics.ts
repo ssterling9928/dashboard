@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { MetricSummary } from '@shared/types'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API = import.meta.env.VITE_API_URL || '/proxy/4000'
 
 interface MetricsResponse {
   cpu:     MetricSummary
@@ -11,13 +11,23 @@ interface MetricsResponse {
   network: MetricSummary
 }
 
+async function fetchMetric(type: string, extraParams = ''): Promise<MetricSummary> {
+  const res = await fetch(`${API}/api/metrics?type=${type}${extraParams}`)
+  if (!res.ok) throw new Error(`Failed to fetch ${type} metrics`)
+  return res.json()
+}
+
 export function useMetrics() {
   return useQuery<MetricsResponse>({
     queryKey: ['metrics'],
     queryFn: async () => {
-      const res = await fetch(`${API}/api/metrics`)
-      if (!res.ok) throw new Error('Failed to fetch metrics')
-      return res.json()
+      const [cpu, memory, storage, network] = await Promise.all([
+        fetchMetric('cpu'),
+        fetchMetric('memory'),
+        fetchMetric('disk', '&volume=volume1'),
+        fetchMetric('network'),
+      ])
+      return { cpu, memory, storage, network }
     },
     refetchInterval: 10000,
   })
