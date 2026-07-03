@@ -1,8 +1,7 @@
 
 import { useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ServiceDetail } from '@shared/types'
-import { fetchService, containerAction } from '../api/Services'
+import { useQueryClient } from '@tanstack/react-query'
+import { useServiceDetail, containerAction } from '../hooks/useServices'
 import HealthBadge from './HealthBadge'
 import dockerIcon from '../assets/docker.png'
 
@@ -98,12 +97,7 @@ function SkeletonModal() {
 export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
   const queryClient = useQueryClient()
 
-  const { data: service, isLoading, isError } = useQuery<ServiceDetail>({
-    queryKey:  ['service', serviceId],
-    queryFn:   () => fetchService(serviceId!),
-    enabled:   !!serviceId,
-    staleTime: 0,
-  })
+  const { data: service, isLoading, isError } = useServiceDetail(serviceId)
 
   // Close on Escape
   useEffect(() => {
@@ -125,7 +119,7 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
   async function handleAction(action: 'start' | 'stop' | 'restart') {
     if (!serviceId) return
     await containerAction(serviceId, action)
-    queryClient.invalidateQueries({ queryKey: ['service', serviceId] })
+    queryClient.invalidateQueries({ queryKey: ['services', serviceId] })
     queryClient.invalidateQueries({ queryKey: ['services'] })
   }
 

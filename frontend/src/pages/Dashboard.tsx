@@ -9,7 +9,7 @@ import MonitoringTab from '../components/MonitoringTab'
 import LogsTab from '../components/LogsTab'
 import ServiceDetailModal from '../components/ServiceDetailModal'
 
-import { useServices, useServiceDetail } from '../hooks/useServices'
+import { useServices } from '../hooks/useServices'
 import { usePackages } from '../hooks/usePackages'
 import { useMetrics } from '../hooks/useMetrics'
 import { useLogs } from '../hooks/useLogs'
@@ -39,7 +39,6 @@ export default function Dashboard() {
   const { data: packages,  isLoading: packagesLoading  } = usePackages()
   const { data: metrics,   isLoading: metricsLoading   } = useMetrics()
   const { data: logs,      isLoading: logsLoading      } = useLogs()
-  const { data: serviceDetail }                           = useServiceDetail(selectedServiceId)
 
   const now = new Date().toLocaleTimeString()
 
@@ -152,7 +151,7 @@ export default function Dashboard() {
                   ? <p className="text-sm text-gray-400">Loading logs...</p>
                   : <LogsTab
                       logs={logs ?? []}
-                      grafanaUrl="http://localhost:3000"
+                      grafanaUrl={import.meta.env.VITE_GRAFANA_URL}
                     />
               )}
             </div>
@@ -223,9 +222,9 @@ export default function Dashboard() {
       </div>
 
       {/* ── Service Detail Modal ── */}
-      {selectedServiceId && serviceDetail && (
+      {selectedServiceId && (
         <ServiceDetailModal
-          serviceId={serviceDetail.id}
+          serviceId={selectedServiceId}
           onClose={() => setSelectedServiceId(null)}
         />
       )}
