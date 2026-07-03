@@ -26,3 +26,9 @@ export function useServiceDetail(id: string | null) {
     enabled: !!id,
   })
 }
+
+export async function containerAction(id: string, action: 'start' | 'stop' | 'restart') {
+  const res = await fetch(`${API}/api/services/${id}/${action}`, { method: 'POST' })
+  if (!res.ok) throw new Error(`Failed to ${action} container`)
+  return res.json()
+}
