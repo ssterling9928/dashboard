@@ -6,6 +6,8 @@ import { fetchService, containerAction } from '../api/Services'
 import HealthBadge from './HealthBadge'
 import dockerIcon from '../assets/docker.png'
 
+const API = import.meta.env.VITE_API_URL || '/proxy/4000'
+
 interface Props {
   serviceId: string | null
   onClose:   () => void
@@ -228,7 +230,7 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
                   <ToolButton
                     label="Inspect Container"
                     buttonText="Inspect"
-                    href={`/api/services/${service.ServiceId}/inspect`}
+                    href={`${API}/api/services/${service.ServiceId}/inspect`}
                     variant="gray"
                   />
                 </div>

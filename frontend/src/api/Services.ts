@@ -1,5 +1,6 @@
 
-const BASE = '/api/services'
+const API = import.meta.env.VITE_API_URL || '/proxy/4000'
+const BASE = `${API}/api/services`
 
 export async function fetchServices() {
   const res = await fetch(BASE)
