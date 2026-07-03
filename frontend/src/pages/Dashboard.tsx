@@ -8,6 +8,7 @@ import PackagesTab from '../components/PackagesTab'
 import MonitoringTab from '../components/MonitoringTab'
 import LogsTab from '../components/LogsTab'
 import ServiceDetailModal from '../components/ServiceDetailModal'
+import PackageDetailModal from '../components/PackageDetailModal'
 
 import { useServices } from '../hooks/useServices'
 import { usePackages } from '../hooks/usePackages'
@@ -34,6 +35,7 @@ const ALERTS = [
 export default function Dashboard() {
   const [activeTab, setActiveTab]         = useState<Tab>('services')
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
 
   const { data: services,  isLoading: servicesLoading  } = useServices()
   const { data: packages,  isLoading: packagesLoading  } = usePackages()
@@ -71,7 +73,7 @@ export default function Dashboard() {
           <StatCard
             label="CPU Usage"
             value={metrics ? `${metrics.cpu.current}${metrics.cpu.unit}` : '—'}
-            note={metricsLoading ? 'Loading...' : '8 cores / 16 threads'}
+            note={metricsLoading ? 'Loading...' : '4 cores / 4 threads'}
             icon={<Cpu size={16} />}
             percent={metrics?.cpu.current}
           />
@@ -122,7 +124,7 @@ export default function Dashboard() {
                   ? <p className="text-sm text-gray-400">Loading packages...</p>
                   : <PackagesTab
                       packages={packages ?? []}
-                      onSelectPackage={(id) => console.log('package selected:', id)}
+                      onSelectPackage={setSelectedPackageId}
                     />
               )}
               {activeTab === 'monitoring' && (
@@ -226,6 +228,14 @@ export default function Dashboard() {
         <ServiceDetailModal
           serviceId={selectedServiceId}
           onClose={() => setSelectedServiceId(null)}
+        />
+      )}
+
+      {/* ── Package Detail Modal ── */}
+      {selectedPackageId && (
+        <PackageDetailModal
+          packageId={selectedPackageId}
+          onClose={() => setSelectedPackageId(null)}
         />
       )}
     </div>
