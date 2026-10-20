@@ -1,31 +1,11 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import type { Package, PackageDetail } from './../types/types.js'
+import { getJson } from '../lib/http.js'
 
 const router = Router()
 
 const SYNO_HELPER_URL =
   process.env.SYNO_HELPER_URL?.replace(/\/+$/, '') ?? 'http://YOUR_NAS_IP:4111'
-
-async function getJson<T>(url: string): Promise<T> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 10000)
-
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '')
-      throw new Error(`Helper request failed (${response.status}): ${body || response.statusText}`)
-    }
-
-    return (await response.json()) as T
-  } finally {
-    clearTimeout(timeout)
-  }
-}
 
 router.get(
   '/',

@@ -1,5 +1,6 @@
 
 import HealthBadge from './HealthBadge'
+import HostBadge from './HostBadge'
 import type { Service } from '@shared/types'
 import dockerIcon from '../assets/docker.png'
 
@@ -36,7 +37,10 @@ export default function ServiceCard({ service, onDetails }: Props) {
           </div>
         </div>
 
-        <HealthBadge status={service.Status} />
+        <div className="flex flex-col items-end gap-2">
+          <HealthBadge status={service.Status} />
+          <HostBadge host={service.Host} />
+        </div>
       </div>
 
       {/* Detail Rows */}

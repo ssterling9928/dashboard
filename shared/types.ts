@@ -1,4 +1,6 @@
 
+export type Host = 'synology' | 'titan'
+
 // ── Docker Container ──────────────────────────────────────
 export interface Service {
   ServiceId:   string
@@ -7,6 +9,7 @@ export interface Service {
   Status:      string
   Uptime:      string
   Type:        'container'
+  Host:        Host
 }
 
 export interface ServiceDetail extends Service {
@@ -16,8 +19,7 @@ export interface ServiceDetail extends Service {
   Ports:         string[]
   Started:       string
   Restarts:      number
-  PublicUrl:     string | null
-  InternalUrl:   string | null
+  Url:           string
   Networks:      string[]
 }
 

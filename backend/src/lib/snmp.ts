@@ -56,7 +56,7 @@ function normalizeValue(value: unknown, type?: number): number | string {
     if (type === snmp.ObjectType.Counter64) {
       let n = 0
       for (let i = 0; i < value.length; i++) {
-        n = n * 256 + value[i]
+        n = n * 256 + (value[i] ?? 0)
       }
       return Number.isFinite(n) ? n : 0
     }
