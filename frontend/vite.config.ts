@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   // Set in .env when developing behind the code-server proxy
-  // (e.g. VITE_BASE_PATH=/proxy/5173, VITE_HMR_HOST=code.sterling-dev.com).
+  // (e.g. VITE_BASE_PATH=/proxy/5173, VITE_HMR_HOST=code.home.sterling-dev.com).
   // Leave both unset for local dev — Vite falls back to normal root-path
   // serving and same-host HMR.
   const PREFIX = (env.VITE_BASE_PATH || '').replace(/\/$/, '')

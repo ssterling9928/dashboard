@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useServiceDetail, containerAction } from '../hooks/useServices'
 import HealthBadge from './HealthBadge'
+import HostBadge from './HostBadge'
 import dockerIcon from '../assets/docker.png'
 
 const API = import.meta.env.VITE_API_URL || '/proxy/4000'
@@ -127,10 +128,6 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
     ? `${import.meta.env.VITE_GRAFANA_URL}/explore?left={"queries":[{"expr":"{container_name=\\"${service.Name}\\"}"}]}`
     : '#'
 
-  const appUrl = service?.Ports?.length
-    ? `http://${window.location.hostname}:${service.Ports[0]?.split(':')[0]}`
-    : '#'
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -160,6 +157,7 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
                   <div className="flex items-center gap-3">
                     <h2 className="text-xl font-bold text-gray-900">{service.Name}</h2>
                     <HealthBadge status={service.Status} />
+                    <HostBadge host={service.Host} />
                   </div>
                   <span className="text-sm text-gray-500">{service.Version}</span>
                 </div>
@@ -186,10 +184,8 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
 
               {/* Network */}
               <Section title="Network">
-                <DetailRow label="Public Hostname" value={window.location.hostname} />
-                <DetailRow label="Internal Url"    value={service.InternalUrl} />
-                <DetailRow label="Ports"           value={service.Ports?.join(', ') || 'None'} />
-                <DetailRow label="URL"             value={appUrl !== '#' ? appUrl : '—'} />
+                <DetailRow label="URL"   value={service.Url} />
+                <DetailRow label="Ports" value={service.Ports?.join(', ') || 'None'} />
               </Section>
 
               {/* Runtime */}
@@ -206,7 +202,7 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
                   <ToolButton
                     label="Open App"
                     buttonText="Open"
-                    href={appUrl}
+                    href={service.Url}
                     variant="green"
                   />
                   <ToolButton
