@@ -1,5 +1,5 @@
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import type { MetricSummary } from '@shared/types'
 
 const API = import.meta.env.VITE_API_URL || '/proxy/4000'
@@ -30,5 +30,15 @@ export function useMetrics() {
       return { cpu, memory, storage, network }
     },
     refetchInterval: 10000,
+  })
+}
+
+// Single metric over a time range — used by the monitoring charts
+export function useMetric(type: string, hours: number, extraParams = '') {
+  return useQuery<MetricSummary>({
+    queryKey: ['metrics', type, hours, extraParams],
+    queryFn: () => fetchMetric(type, `&range=${hours}${extraParams}`),
+    placeholderData: keepPreviousData,
+    refetchInterval: 30000,
   })
 }

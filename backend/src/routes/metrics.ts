@@ -5,8 +5,13 @@ import type { MetricSummary, MetricPoint, Host } from '../types/types.js'
 
 const router = Router()
 
-// In-memory ring buffer — stores last 288 readings (24hrs at 5min intervals)
-const BUFFER_SIZE = 288
+// In-memory ring buffer — 24hrs of readings at the 30s poll interval
+const POLL_INTERVAL_MS = 30 * 1000
+const MAX_RANGE_HOURS  = 24
+const BUFFER_SIZE      = (MAX_RANGE_HOURS * 60 * 60 * 1000) / POLL_INTERVAL_MS
+
+// Longer ranges are averaged down to at most this many chart points
+const MAX_CHART_POINTS = 288
 const DEFAULT_VOLUME: Record<Host, string> = {
   synology: '/volume1',
   titan:    '/',
@@ -64,9 +69,25 @@ function getDiskHistory(host: Host, volume: string): MetricPoint[] {
 }
 
 function getRange(points: MetricPoint[], hours: number): MetricPoint[] {
-  const safeHours = Math.max(1, Math.min(24, hours))
-  const count = Math.min(safeHours * 12, points.length)
-  return points.slice(-count)
+  const safeHours = Math.max(1, Math.min(MAX_RANGE_HOURS, hours))
+  const cutoff = Date.now() - safeHours * 60 * 60 * 1000
+  return points.filter(p => new Date(p.time).getTime() >= cutoff)
+}
+
+// Average consecutive points into buckets so the chart stays readable
+function downsample(points: MetricPoint[], round: (n: number) => number): MetricPoint[] {
+  if (points.length <= MAX_CHART_POINTS) return points
+
+  const bucketSize = Math.ceil(points.length / MAX_CHART_POINTS)
+  const result: MetricPoint[] = []
+
+  for (let i = 0; i < points.length; i += bucketSize) {
+    const bucket = points.slice(i, i + bucketSize)
+    const avg = bucket.reduce((sum, p) => sum + p.value, 0) / bucket.length
+    result.push({ time: bucket[bucket.length - 1]!.time, value: round(avg) })
+  }
+
+  return result
 }
 
 function summarizePoints(points: MetricPoint[], hours: number, unit = '%'): MetricSummary {
@@ -82,7 +103,7 @@ function summarizePoints(points: MetricPoint[], hours: number, unit = '%'): Metr
     : 0
   const peak = values.length ? round(Math.max(...values)) : 0
 
-  return { current, average, peak, unit, history: pts }
+  return { current, average, peak, unit, history: downsample(pts, round) }
 }
 
 function oidIndex(oid: string): string {
@@ -230,7 +251,7 @@ async function pollMetrics() {
 
 // Start polling immediately then every 30s
 pollMetrics()
-setInterval(pollMetrics, 30 * 1000)
+setInterval(pollMetrics, POLL_INTERVAL_MS)
 
 // GET /api/metrics?type=cpu&range=24&host=synology
 // GET /api/metrics?type=disk&range=24&volume=volume1&host=titan

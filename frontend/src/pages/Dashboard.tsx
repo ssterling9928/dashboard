@@ -128,25 +128,11 @@ export default function Dashboard() {
                     />
               )}
               {activeTab === 'monitoring' && (
-                metricsLoading || !metrics
-                  ? <p className="text-sm text-gray-400">Loading metrics...</p>
-                  : <MonitoringTab
-                      cpu={{
-                        label:    'CPU Usage',
-                        subtitle: 'Last 24 Hours',
-                        data:     metrics.cpu,
-                      }}
-                      disk={{
-                        label:    'Disk Usage',
-                        subtitle: 'Last 24 Hours',
-                        data:     metrics.storage,
-                      }}
-                      network={{
-                        label:    'Network Usage',
-                        subtitle: 'Last 24 Hours',
-                        data:     metrics.network,
-                      }}
-                    />
+                <MonitoringTab
+                  cpu={{     label: 'CPU Usage',     type: 'cpu' }}
+                  disk={{    label: 'Disk Usage',    type: 'disk', params: '&volume=volume1' }}
+                  network={{ label: 'Network Usage', type: 'network' }}
+                />
               )}
               {activeTab === 'logs' && (
                 logsLoading
