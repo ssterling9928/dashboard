@@ -61,4 +61,32 @@ export interface LogEntry {
   message: string
 }
 
+// ── System Status / Alerts ────────────────────────────────
+export interface HostStatus {
+  host:        Host
+  label:       string
+  online:      boolean
+  model:       string | null
+  uptimeSec:   number | null
+  loadAvg:     [number, number, number] | null
+  containers:  { running: number; total: number } | null
+  lastPolled:  string | null
+}
+
+export type AlertSeverity = 'critical' | 'warning'
+
+export interface Alert {
+  id:        string
+  severity:  AlertSeverity
+  host:      Host
+  title:     string
+  detail:    string
+}
+
+export interface SystemStatus {
+  overall:  'ok' | 'warning' | 'critical'
+  hosts:    HostStatus[]
+  alerts:   Alert[]
+}
+
 export type SynoParams = Record<string, string | number | boolean | string[]>

@@ -6,6 +6,7 @@ import servicesRouter from "./routes/services.js"
 import metricsRouter from "./routes/metrics.js"
 import logsRouter from "./routes/logs.js"
 import packagesRouter from "./routes/packages.js"
+import statusRouter from "./routes/status.js"
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -32,6 +33,7 @@ app.use('/api/services', servicesRouter)
 app.use('/api/metrics', metricsRouter)
 app.use('/api/logs', logsRouter)
 app.use('/api/packages', packagesRouter)
+app.use('/api/status', statusRouter)
 
 app.get('/api/debug', async (_req, res, next) => {
   try {

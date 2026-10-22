@@ -70,7 +70,7 @@ function splitServiceId(id: string): { host: Host; name: string } {
 
 // ── Synology ──────────────────────────────────────────────
 
-async function listSynologyServices(): Promise<Service[]> {
+export async function listSynologyServices(): Promise<Service[]> {
   const listData = await synoRequest('SYNO.Docker.Container', 'list', 1, {
     limit:  '100',
     offset: '0',
@@ -138,7 +138,7 @@ async function getSynologyServiceDetail(name: string): Promise<ServiceDetail> {
 
 // ── Titan ─────────────────────────────────────────────────
 
-async function listTitanServices(): Promise<Service[]> {
+export async function listTitanServices(): Promise<Service[]> {
   const containers = await getTitanContainers()
 
   return containers.map(c => ({

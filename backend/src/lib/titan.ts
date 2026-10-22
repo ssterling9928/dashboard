@@ -45,6 +45,9 @@ export interface TitanSystemMetrics {
   disks:       TitanDiskUsage[]
   netInBytes:  number
   netOutBytes: number
+  // Added after the first helper deploy — absent until titan's copy is updated
+  uptimeSec?:  number
+  loadAvg?:    [number, number, number]
   timestamp:   number
 }
 

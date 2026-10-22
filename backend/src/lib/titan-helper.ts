@@ -148,12 +148,25 @@ async function getNetBytes(iface: string): Promise<{ inBytes: number; outBytes: 
   return { inBytes: 0, outBytes: 0 }
 }
 
+async function getUptimeSec(): Promise<number> {
+  const raw = await fs.readFile('/proc/uptime', 'utf8')
+  return Math.floor(Number(raw.split(/\s+/)[0]) || 0)
+}
+
+async function getLoadAvg(): Promise<[number, number, number]> {
+  const raw = await fs.readFile('/proc/loadavg', 'utf8')
+  const [l1, l5, l15] = raw.split(/\s+/).map(Number)
+  return [l1 ?? 0, l5 ?? 0, l15 ?? 0]
+}
+
 async function getSystemMetrics() {
-  const [cpuPct, mem, disks, net] = await Promise.all([
+  const [cpuPct, mem, disks, net, uptimeSec, loadAvg] = await Promise.all([
     getCpuPct(),
     getMemInfo(),
     getDiskUsage(),
     getNetBytes(NET_IFACE),
+    getUptimeSec(),
+    getLoadAvg(),
   ])
 
   return {
@@ -163,6 +176,8 @@ async function getSystemMetrics() {
     disks,
     netInBytes: net.inBytes,
     netOutBytes: net.outBytes,
+    uptimeSec,
+    loadAvg,
     timestamp: Date.now(),
   }
 }

@@ -41,3 +41,10 @@ export async function postJson<T>(url: string, timeoutMs = 10000): Promise<T> {
     clearTimeout(timeout)
   }
 }
+
+// fetch() rejects with a generic "fetch failed" — the useful part is in .cause
+export function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err)
+  const cause = err.cause as { code?: string; message?: string } | undefined
+  return cause?.code ?? cause?.message ?? err.message
+}
