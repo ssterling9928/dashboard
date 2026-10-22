@@ -1,32 +1,10 @@
 import { Router } from 'express'
 import { synoRequest } from '../lib/synology.js'
 import { queryLogs } from '../lib/loki.js'
+import { formatTimestamp, parseLevel } from '../lib/parsers.js'
 import type { Host, LogEntry } from '../types/types.js'
 
 const router = Router()
-
-function parseLevel(prio?: string): LogEntry['level'] {
-  switch ((prio ?? '').toLowerCase()) {
-    case 'err':
-    case 'error':
-    case 'crit':
-    case 'critical':
-    case 'alert':
-    case 'emerg':
-    case 'emergency':
-      return 'error'
-    case 'warn':
-    case 'warning':
-      return 'warning'
-    default:
-      return 'info'
-  }
-}
-
-// "2026-10-22 12:45:55" in the server's local time — matches DSM's log format
-function formatTimestamp(ms: number): string {
-  return new Date(ms).toLocaleString('sv-SE').replace('T', ' ')
-}
 
 async function getSynologyLogs(limit: number): Promise<LogEntry[]> {
   // 50 logs seems to be the max this api will get

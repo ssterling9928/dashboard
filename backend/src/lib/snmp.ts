@@ -76,7 +76,7 @@ function createSession() {
   })
 }
 
-function normalizeValue(value: unknown, type?: number): number | string {
+export function normalizeValue(value: unknown, type?: number): number | string {
   if (value instanceof Buffer) {
     // Counter64 is returned as an 8-byte big-endian Buffer — read it as a number
     if (type === snmp.ObjectType.Counter64) {

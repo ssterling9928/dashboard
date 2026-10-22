@@ -49,5 +49,8 @@
   "include": [
     "src/**/*",
     "../shared/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
   ]
 }

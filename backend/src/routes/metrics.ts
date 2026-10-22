@@ -2,17 +2,17 @@ import { Router } from 'express'
 import { snmpGet, snmpWalk, OIDs } from '../lib/snmp.js'
 import { getTitanSystemMetrics } from '../lib/titan.js'
 import { describeError } from '../lib/http.js'
-import type { MetricSummary, MetricPoint, Host } from '../types/types.js'
+import {
+  POLL_INTERVAL_MS,
+  BUFFER_SIZE,
+  clampPercent,
+  summarizePoints,
+} from '../lib/metricMath.js'
+import type { MetricPoint, Host } from '../types/types.js'
+import type { HostSnapshot, VaultHealth } from '../lib/hostHealth.js'
 
 const router = Router()
 
-// In-memory ring buffer — 24hrs of readings at the 30s poll interval
-const POLL_INTERVAL_MS = 30 * 1000
-const MAX_RANGE_HOURS  = 24
-const BUFFER_SIZE      = (MAX_RANGE_HOURS * 60 * 60 * 1000) / POLL_INTERVAL_MS
-
-// Longer ranges are averaged down to at most this many chart points
-const MAX_CHART_POINTS = 288
 const DEFAULT_VOLUME: Record<Host, string> = {
   synology: '/volume1',
   titan:    '/',
@@ -38,25 +38,6 @@ let synologyNetSnapshot: NetSnapshot | null = null
 let titanNetSnapshot: NetSnapshot | null = null
 
 // ── Host status (read by routes/status.ts) ────────────────
-
-export interface HostSnapshot {
-  online:     boolean
-  error:      string | null    // last poll error; null before the first poll
-  lastPolled: string | null
-  model:      string | null
-  uptimeSec:  number | null
-  loadAvg:    [number, number, number] | null
-}
-
-export interface VaultHealth {
-  systemStatus: number
-  temperature:  number
-  powerStatus:  number
-  systemFan:    number
-  cpuFan:       number
-  disks: { name: string; status: number; health: number; temperature: number }[]
-  raids: { name: string; status: number }[]
-}
 
 function emptySnapshot(): HostSnapshot {
   return { online: false, error: null, lastPolled: null, model: null, uptimeSec: null, loadAvg: null }
@@ -88,11 +69,6 @@ export function getCurrentDiskUsage(host: Host): { volume: string; pct: number }
     .map(([volume, points]) => ({ volume, pct: points[points.length - 1]!.value }))
 }
 
-function clampPercent(value: number): number {
-  if (!Number.isFinite(value)) return 0
-  return Math.max(0, Math.min(100, value))
-}
-
 function pushReading(buf: MetricPoint[], value: number) {
   buf.push({
     time: new Date().toISOString(),
@@ -118,44 +94,6 @@ function getDiskHistory(host: Host, volume: string): MetricPoint[] {
     diskHistory[host][volume] = []
   }
   return diskHistory[host][volume]
-}
-
-function getRange(points: MetricPoint[], hours: number): MetricPoint[] {
-  const safeHours = Math.max(1, Math.min(MAX_RANGE_HOURS, hours))
-  const cutoff = Date.now() - safeHours * 60 * 60 * 1000
-  return points.filter(p => new Date(p.time).getTime() >= cutoff)
-}
-
-// Average consecutive points into buckets so the chart stays readable
-function downsample(points: MetricPoint[], round: (n: number) => number): MetricPoint[] {
-  if (points.length <= MAX_CHART_POINTS) return points
-
-  const bucketSize = Math.ceil(points.length / MAX_CHART_POINTS)
-  const result: MetricPoint[] = []
-
-  for (let i = 0; i < points.length; i += bucketSize) {
-    const bucket = points.slice(i, i + bucketSize)
-    const avg = bucket.reduce((sum, p) => sum + p.value, 0) / bucket.length
-    result.push({ time: bucket[bucket.length - 1]!.time, value: round(avg) })
-  }
-
-  return result
-}
-
-function summarizePoints(points: MetricPoint[], hours: number, unit = '%'): MetricSummary {
-  const pts = getRange(points, hours)
-  const values = pts.map(p => p.value)
-  const round = unit === '%'
-    ? (n: number) => Math.round(n)
-    : (n: number) => Math.round(n * 100) / 100
-
-  const current = values[values.length - 1] ?? 0
-  const average = values.length
-    ? round(values.reduce((a, b) => a + b, 0) / values.length)
-    : 0
-  const peak = values.length ? round(Math.max(...values)) : 0
-
-  return { current, average, peak, unit, history: downsample(pts, round) }
 }
 
 function oidIndex(oid: string): string {
