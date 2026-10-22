@@ -35,11 +35,37 @@ export const OIDs = {
   volumeTotal:     '1.3.6.1.2.1.25.2.3.1.5',          // hrStorageSize
   volumeUsed:      '1.3.6.1.2.1.25.2.3.1.6',          // hrStorageUsed
 
+  // Host uptime (hundredths of a second) — sysUpTime above is the SNMP agent's uptime
+  hostUptime:      '1.3.6.1.2.1.25.1.1.0',            // hrSystemUptime
+
+  // Load average
+  load1:           '1.3.6.1.4.1.2021.10.1.3.1',       // laLoad.1
+  load5:           '1.3.6.1.4.1.2021.10.1.3.2',       // laLoad.2
+  load15:          '1.3.6.1.4.1.2021.10.1.3.3',       // laLoad.3
+
   // Synology-specific containers
   synoSystem:      '1.3.6.1.4.1.6574.1',              // synoSystem
   synoDisk:        '1.3.6.1.4.1.6574.2',              // synoDisk
   synoRaid:        '1.3.6.1.4.1.6574.3',              // synoRaid
   synoUPS:         '1.3.6.1.4.1.6574.4',              // synoUPS
+
+  // Synology system health (1 = normal, 2 = failed)
+  systemStatus:    '1.3.6.1.4.1.6574.1.1.0',
+  temperature:     '1.3.6.1.4.1.6574.1.2.0',          // °C
+  powerStatus:     '1.3.6.1.4.1.6574.1.3.0',
+  systemFanStatus: '1.3.6.1.4.1.6574.1.4.1.0',
+  cpuFanStatus:    '1.3.6.1.4.1.6574.1.4.2.0',
+  modelName:       '1.3.6.1.4.1.6574.1.5.1.0',
+
+  // Synology disk table — walk per-disk
+  diskName:        '1.3.6.1.4.1.6574.2.1.1.2',        // "Disk 1"
+  diskStatus:      '1.3.6.1.4.1.6574.2.1.1.5',        // 1 = normal … 5 = crashed
+  diskTemperature: '1.3.6.1.4.1.6574.2.1.1.6',        // °C
+  diskHealth:      '1.3.6.1.4.1.6574.2.1.1.13',       // 1 = normal, 2 = warning, 3 = critical, 4 = failing
+
+  // Synology RAID table — walk per-volume/pool
+  raidName:        '1.3.6.1.4.1.6574.3.1.1.2',        // "Volume 1", "Storage Pool 1"
+  raidStatus:      '1.3.6.1.4.1.6574.3.1.1.3',        // 1 = normal, 11 = degraded, 12 = crashed
 }
 
 function createSession() {

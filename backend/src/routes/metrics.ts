@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { snmpGet, snmpWalk, OIDs } from '../lib/snmp.js'
 import { getTitanSystemMetrics } from '../lib/titan.js'
+import { describeError } from '../lib/http.js'
 import type { MetricSummary, MetricPoint, Host } from '../types/types.js'
 
 const router = Router()
@@ -35,6 +36,57 @@ interface NetSnapshot {
 
 let synologyNetSnapshot: NetSnapshot | null = null
 let titanNetSnapshot: NetSnapshot | null = null
+
+// ── Host status (read by routes/status.ts) ────────────────
+
+export interface HostSnapshot {
+  online:     boolean
+  error:      string | null    // last poll error; null before the first poll
+  lastPolled: string | null
+  model:      string | null
+  uptimeSec:  number | null
+  loadAvg:    [number, number, number] | null
+}
+
+export interface VaultHealth {
+  systemStatus: number
+  temperature:  number
+  powerStatus:  number
+  systemFan:    number
+  cpuFan:       number
+  disks: { name: string; status: number; health: number; temperature: number }[]
+  raids: { name: string; status: number }[]
+}
+
+function emptySnapshot(): HostSnapshot {
+  return { online: false, error: null, lastPolled: null, model: null, uptimeSec: null, loadAvg: null }
+}
+
+const snapshots: Record<Host, HostSnapshot> = {
+  synology: emptySnapshot(),
+  titan:    emptySnapshot(),
+}
+
+let vaultHealth: VaultHealth | null = null
+
+export function getHostSnapshot(host: Host): HostSnapshot {
+  return snapshots[host]
+}
+
+export function getVaultHealth(): VaultHealth | null {
+  return vaultHealth
+}
+
+// Last `count` raw readings, oldest first
+export function getRecentReadings(host: Host, type: 'cpu' | 'memory', count: number): number[] {
+  return getMetricHistory(host, type).slice(-count).map(p => p.value)
+}
+
+export function getCurrentDiskUsage(host: Host): { volume: string; pct: number }[] {
+  return Object.entries(diskHistory[host])
+    .filter(([, points]) => points.length > 0)
+    .map(([volume, points]) => ({ volume, pct: points[points.length - 1]!.value }))
+}
 
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -206,9 +258,71 @@ async function pollSynologyMetrics() {
   }
 }
 
+// Poll Vault's uptime, load and Synology hardware health via SNMP
+async function pollSynologyHealth() {
+  const vals = await snmpGet([
+    OIDs.hostUptime,
+    OIDs.load1,
+    OIDs.load5,
+    OIDs.load15,
+    OIDs.modelName,
+    OIDs.systemStatus,
+    OIDs.temperature,
+    OIDs.powerStatus,
+    OIDs.systemFanStatus,
+    OIDs.cpuFanStatus,
+  ])
+  const num = (oid: string) => Number(vals[oid] ?? 0)
+
+  snapshots.synology.uptimeSec = Math.floor(num(OIDs.hostUptime) / 100)
+  snapshots.synology.loadAvg   = [num(OIDs.load1), num(OIDs.load5), num(OIDs.load15)]
+  snapshots.synology.model     = String(vals[OIDs.modelName] ?? '') || null
+
+  const [diskNames, diskStatus, diskHealth, diskTemp, raidNames, raidStatus] = await Promise.all([
+    snmpWalk(OIDs.diskName),
+    snmpWalk(OIDs.diskStatus),
+    snmpWalk(OIDs.diskHealth),
+    snmpWalk(OIDs.diskTemperature),
+    snmpWalk(OIDs.raidName),
+    snmpWalk(OIDs.raidStatus),
+  ])
+
+  const byIndex = (rows: { oid: string; value: number | string }[]) =>
+    new Map(rows.map(r => [oidIndex(r.oid), r.value]))
+
+  const diskStatusMap = byIndex(diskStatus)
+  const diskHealthMap = byIndex(diskHealth)
+  const diskTempMap   = byIndex(diskTemp)
+  const raidStatusMap = byIndex(raidStatus)
+
+  vaultHealth = {
+    systemStatus: num(OIDs.systemStatus),
+    temperature:  num(OIDs.temperature),
+    powerStatus:  num(OIDs.powerStatus),
+    systemFan:    num(OIDs.systemFanStatus),
+    cpuFan:       num(OIDs.cpuFanStatus),
+    disks: diskNames.map(row => {
+      const index = oidIndex(row.oid)
+      return {
+        name:        String(row.value),
+        status:      Number(diskStatusMap.get(index) ?? 0),
+        health:      Number(diskHealthMap.get(index) ?? 0),
+        temperature: Number(diskTempMap.get(index) ?? 0),
+      }
+    }),
+    raids: raidNames.map(row => ({
+      name:   String(row.value),
+      status: Number(raidStatusMap.get(oidIndex(row.oid)) ?? 0),
+    })),
+  }
+}
+
 // Poll titan via the titan helper agent
 async function pollTitanMetrics() {
   const metrics = await getTitanSystemMetrics()
+
+  snapshots.titan.uptimeSec = metrics.uptimeSec ?? null
+  snapshots.titan.loadAvg   = metrics.loadAvg ?? null
 
   pushReading(getMetricHistory('titan', 'cpu'), metrics.cpuPct)
 
@@ -238,14 +352,36 @@ async function pollTitanMetrics() {
   titanNetSnapshot = { inBytes: metrics.netInBytes, outBytes: metrics.netOutBytes, timestamp: now }
 }
 
-async function pollMetrics() {
-  const results = await Promise.allSettled([pollSynologyMetrics(), pollTitanMetrics()])
+function recordPoll(host: Host, result: PromiseSettledResult<void>) {
+  const snapshot = snapshots[host]
+  snapshot.online = result.status === 'fulfilled'
 
-  if (results[0]?.status === 'rejected') {
-    console.error('Synology SNMP poll error:', results[0].reason)
+  if (result.status === 'fulfilled') {
+    snapshot.error = null
+    snapshot.lastPolled = new Date().toISOString()
+  } else {
+    snapshot.error = describeError(result.reason)
   }
-  if (results[1]?.status === 'rejected') {
-    console.error('Titan metrics poll error:', results[1].reason)
+}
+
+async function pollMetrics() {
+  const [synology, synologyHealth, titan] = await Promise.allSettled([
+    pollSynologyMetrics(),
+    pollSynologyHealth(),
+    pollTitanMetrics(),
+  ])
+
+  recordPoll('synology', synology)
+  recordPoll('titan', titan)
+
+  if (synology.status === 'rejected') {
+    console.error('Synology SNMP poll error:', synology.reason)
+  }
+  if (synologyHealth.status === 'rejected') {
+    console.error('Synology health poll error:', synologyHealth.reason)
+  }
+  if (titan.status === 'rejected') {
+    console.error('Titan metrics poll error:', titan.reason)
   }
 }
 

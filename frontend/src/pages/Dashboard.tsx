@@ -9,28 +9,17 @@ import MonitoringTab from '../components/MonitoringTab'
 import LogsTab from '../components/LogsTab'
 import ServiceDetailModal from '../components/ServiceDetailModal'
 import PackageDetailModal from '../components/PackageDetailModal'
+import SystemStatusCard from '../components/SystemStatusCard'
+import AlertsCard from '../components/AlertsCard'
+import QuickLinksCard from '../components/QuickLinksCard'
 
 import { useServices } from '../hooks/useServices'
 import { usePackages } from '../hooks/usePackages'
 import { useMetrics } from '../hooks/useMetrics'
 import { useLogs } from '../hooks/useLogs'
+import { useStatus } from '../hooks/useStatus'
 
 type Tab = 'services' | 'packages' | 'monitoring' | 'logs'
-
-// ── Static sidebar data ───────────────────────────────────
-const QUICK_LINKS = [
-  { label: 'Server Management', href: '#' },
-  { label: 'Database Console',  href: '#' },
-  { label: 'Cloud Dashboard',   href: '#' },
-  { label: 'Analytics Portal',  href: '#' },
-  { label: 'User Management',   href: '#' },
-  { label: 'System Settings',   href: '#' },
-]
-
-const ALERTS = [
-  { type: 'warning', message: 'High cache memory usage', sub: 'Consider scaling Redis instance' },
-  { type: 'success', message: 'Backup completed',        sub: 'Daily backup finished at 2:00 AM' },
-]
 
 export default function Dashboard() {
   const [activeTab, setActiveTab]         = useState<Tab>('services')
@@ -41,6 +30,7 @@ export default function Dashboard() {
   const { data: packages,  isLoading: packagesLoading  } = usePackages()
   const { data: metrics,   isLoading: metricsLoading   } = useMetrics()
   const { data: logs,      isLoading: logsLoading      } = useLogs()
+  const { data: status,    isError:   statusError      } = useStatus()
 
   const now = new Date().toLocaleTimeString()
 
@@ -148,62 +138,9 @@ export default function Dashboard() {
           {/* ── Right: Sidebar ── */}
           <div className="w-64 shrink-0 space-y-4">
 
-            {/* System Status */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">System Status</h3>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-sm text-green-600 font-medium">All Systems Operational</span>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Uptime</span>
-                  <span className="text-gray-700 font-medium">45d 12h 34m</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Load Average</span>
-                  <span className="text-gray-700 font-medium">2.4, 2.1, 1.8</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Active Connections</span>
-                  <span className="text-gray-700 font-medium">1,247</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Alerts */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Alerts</h3>
-              <div className="space-y-3">
-                {ALERTS.map((alert, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
-                      alert.type === 'warning' ? 'bg-yellow-400' : 'bg-green-400'
-                    }`} />
-                    <div>
-                      <p className="text-sm text-gray-800 font-medium">{alert.message}</p>
-                      <p className="text-xs text-gray-400">{alert.sub}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Links */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Quick Links</h3>
-              <div className="space-y-2">
-                {QUICK_LINKS.map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            </div>
+            <SystemStatusCard status={status} isError={statusError} />
+            <AlertsCard alerts={status?.alerts} />
+            <QuickLinksCard />
 
           </div>
         </div>

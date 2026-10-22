@@ -4,7 +4,7 @@ import { getJson } from '../lib/http.js'
 
 const router = Router()
 
-const SYNO_HELPER_URL =
+export const SYNO_HELPER_URL =
   process.env.SYNO_HELPER_URL?.replace(/\/+$/, '') ?? 'http://YOUR_NAS_IP:4111'
 
 router.get(
