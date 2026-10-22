@@ -1,6 +1,6 @@
 
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import type { MetricSummary } from '@shared/types'
+import type { Host, MetricSummary } from '@shared/types'
 
 const API = import.meta.env.VITE_API_URL || '/proxy/4000'
 
@@ -17,15 +17,18 @@ async function fetchMetric(type: string, extraParams = ''): Promise<MetricSummar
   return res.json()
 }
 
-export function useMetrics() {
+// Current + 24h summary of every metric for one host — used by the stat cards.
+// Disk uses the backend's default volume per host (/volume1 on Vault, / on Titan).
+export function useMetrics(host: Host) {
   return useQuery<MetricsResponse>({
-    queryKey: ['metrics'],
+    queryKey: ['metrics', 'summary', host],
     queryFn: async () => {
+      const params = `&host=${host}`
       const [cpu, memory, storage, network] = await Promise.all([
-        fetchMetric('cpu'),
-        fetchMetric('memory'),
-        fetchMetric('disk', '&volume=volume1'),
-        fetchMetric('network'),
+        fetchMetric('cpu', params),
+        fetchMetric('memory', params),
+        fetchMetric('disk', params),
+        fetchMetric('network', params),
       ])
       return { cpu, memory, storage, network }
     },
@@ -34,10 +37,10 @@ export function useMetrics() {
 }
 
 // Single metric over a time range — used by the monitoring charts
-export function useMetric(type: string, hours: number, extraParams = '') {
+export function useMetric(type: string, hours: number, host: Host, extraParams = '') {
   return useQuery<MetricSummary>({
-    queryKey: ['metrics', type, hours, extraParams],
-    queryFn: () => fetchMetric(type, `&range=${hours}${extraParams}`),
+    queryKey: ['metrics', type, hours, host, extraParams],
+    queryFn: () => fetchMetric(type, `&range=${hours}&host=${host}${extraParams}`),
     placeholderData: keepPreviousData,
     refetchInterval: 30000,
   })

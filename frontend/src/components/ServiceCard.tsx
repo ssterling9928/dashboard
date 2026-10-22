@@ -14,8 +14,8 @@ export default function ServiceCard({ service, onDetails }: Props) {
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4">
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3 min-w-0">
 
           {/* Icon */}
           <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
@@ -27,8 +27,8 @@ export default function ServiceCard({ service, onDetails }: Props) {
           </div>
 
           {/* Text */}
-          <div className="flex flex-col">
-            <span className="text-lg font-bold text-gray-900 leading-tight">
+          <div className="flex flex-col min-w-0">
+            <span className="text-lg font-bold text-gray-900 leading-tight truncate" title={service.Name}>
               {service.Name}
             </span>
             <span className="text-sm text-gray-500">
@@ -37,7 +37,7 @@ export default function ServiceCard({ service, onDetails }: Props) {
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2 shrink-0">
           <HealthBadge status={service.Status} />
           <HostBadge host={service.Host} />
         </div>

@@ -51,6 +51,7 @@ export interface MetricSummary {
   peak: number
   unit: string
   history: MetricPoint[]
+  volume?: string   // disk metrics only
 }
 
 export interface LogEntry {
