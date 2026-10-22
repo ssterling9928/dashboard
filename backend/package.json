@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "tsx watch --env-file=backend.env src/server.ts",
     "build": "tsc",
-    "start": "node --env-file=backend.env dist/server.js"
+    "start": "node --env-file=backend.env dist/server.js",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -18,7 +21,9 @@
     "@types/net-snmp": "^3.23.0",
     "@types/node": "^25.9.1",
     "tsx": "^4.22.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "8.2.0",
+    "vitest": "5.0.3"
   },
   "dependencies": {
     "cors": "^2.8.6",

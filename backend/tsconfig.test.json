@@ -1,0 +1,12 @@
+// Typechecks the tests (tsconfig.json excludes them from the build)
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*",
+    "../shared/**/*"
+  ],
+  "exclude": []
+}

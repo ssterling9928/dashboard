@@ -3,6 +3,7 @@
 
 import type { HostStatus, SystemStatus } from '@shared/types'
 import HostBadge from './HostBadge'
+import { formatContainers, formatLoad, formatUptime } from '../utils/format'
 
 interface Props {
   status?:  SystemStatus
@@ -13,24 +14,6 @@ const OVERALL = {
   ok:       { dot: 'bg-green-400',  text: 'text-green-600',  label: 'All Systems Operational' },
   warning:  { dot: 'bg-yellow-400', text: 'text-yellow-600', label: 'Some Warnings' },
   critical: { dot: 'bg-red-500',    text: 'text-red-600',    label: 'Issues Detected' },
-}
-
-function formatUptime(seconds: number | null): string {
-  if (seconds === null) return '—'
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}d ${h}h ${m}m`
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
-
-function formatLoad(load: [number, number, number] | null): string {
-  return load ? load.map(n => n.toFixed(2)).join(', ') : '—'
-}
-
-function formatContainers(containers: HostStatus['containers']): string {
-  return containers ? `${containers.running} / ${containers.total} running` : '—'
 }
 
 function Row({ label, value }: { label: string; value: string }) {

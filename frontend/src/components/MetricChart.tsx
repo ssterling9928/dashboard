@@ -9,28 +9,11 @@ import {
   Tooltip,
 } from 'recharts'
 import type { MetricSummary } from '@shared/types'
+import { formatTick, formatTooltipLabel } from '../utils/format'
 
 interface Props {
   data: MetricSummary
   hours: number
-}
-
-// Axis: "2:35 PM" for short ranges, "2 PM" once the chart spans many hours
-function formatTick(time: string, hours: number): string {
-  return new Date(time).toLocaleTimeString([], hours > 6
-    ? { hour: 'numeric' }
-    : { hour: 'numeric', minute: '2-digit' })
-}
-
-// Tooltip: "Tue, Oct 21, 2:35 PM"
-function formatTooltipLabel(time: string): string {
-  return new Date(time).toLocaleString([], {
-    weekday: 'short',
-    month:   'short',
-    day:     'numeric',
-    hour:    'numeric',
-    minute:  '2-digit',
-  })
 }
 
 export default function MetricChart({ data, hours }: Props) {

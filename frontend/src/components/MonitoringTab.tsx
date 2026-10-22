@@ -4,6 +4,7 @@ import MetricChart from './MetricChart'
 import HostToggle from './HostToggle'
 import { useMetric } from '../hooks/useMetrics'
 import { useHostSelection } from '../hooks/useHostSelection'
+import { TIME_RANGES, loadRange, saveRange } from '../utils/timeRanges'
 
 interface MetricSection {
   label: string
@@ -15,31 +16,6 @@ interface Props {
   cpu: MetricSection
   disk: MetricSection
   network: MetricSection
-}
-
-const TIME_RANGES = [
-  { label: '1hr',   hours: 1,  subtitle: 'Last Hour' },
-  { label: '6hrs',  hours: 6,  subtitle: 'Last 6 Hours' },
-  { label: '24hrs', hours: 24, subtitle: 'Last 24 Hours' },
-]
-const DEFAULT_HOURS = 24
-
-// Remember each chart's range across page refreshes
-function loadRange(type: string): number {
-  try {
-    const saved = Number(localStorage.getItem(`metrics-range:${type}`))
-    return TIME_RANGES.some(r => r.hours === saved) ? saved : DEFAULT_HOURS
-  } catch {
-    return DEFAULT_HOURS
-  }
-}
-
-function saveRange(type: string, hours: number) {
-  try {
-    localStorage.setItem(`metrics-range:${type}`, String(hours))
-  } catch {
-    // Storage unavailable (private window etc.) — range just won't persist
-  }
 }
 
 function ChartSection({ section, host }: { section: MetricSection; host: Host }) {
