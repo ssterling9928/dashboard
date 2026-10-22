@@ -24,7 +24,7 @@ const DISK_TEMP_WARN_C   = 60
 
 const HOST_LABELS: Record<Host, string> = {
   synology: 'Vault',
-  titan:    'titan',
+  titan:    'Titan',
 }
 
 // Synology MIB status codes
@@ -71,7 +71,7 @@ function reachabilityAlerts(
   }
   if ((!titan.online && titan.error) || titanServices.status === 'rejected') {
     const detail = titan.error ?? (titanServices.status === 'rejected' ? describeError(titanServices.reason) : '')
-    alerts.push(alert('critical', 'titan', 'helper', 'titan helper unreachable', detail))
+    alerts.push(alert('critical', 'titan', 'helper', 'Titan helper unreachable', detail))
   }
 
   return alerts

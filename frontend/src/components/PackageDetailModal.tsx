@@ -78,7 +78,7 @@ export default function PackageDetailModal({ packageId, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 overflow-hidden"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {isLoading && <SkeletonModal />}
@@ -92,15 +92,15 @@ export default function PackageDetailModal({ packageId, onClose }: Props) {
         {pkg && (
           <>
             {/* ── Header ───────────────────────────────── */}
-            <div className="flex items-start justify-between p-6 border-b border-gray-100">
-              <div className="flex items-start gap-3">
+            <div className="flex items-start justify-between gap-3 p-4 sm:p-6 border-b border-gray-100">
+              <div className="flex items-start gap-3 min-w-0">
                 <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                   <span className="text-blue-600 text-lg font-bold">
                     {pkg.name.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex flex-col">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <h2 className="text-xl font-bold text-gray-900">{pkg.name}</h2>
                     <HealthBadge status={pkg.status} />
                   </div>
@@ -117,7 +117,7 @@ export default function PackageDetailModal({ packageId, onClose }: Props) {
             </div>
 
             {/* ── Body ─────────────────────────────────── */}
-            <div className="p-6 grid grid-cols-2 gap-8">
+            <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
 
               {/* Overview */}
               <Section title="Overview">

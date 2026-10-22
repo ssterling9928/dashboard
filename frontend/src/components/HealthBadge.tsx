@@ -32,8 +32,8 @@ export default function HealthBadge({ status }: Props) {
     <span
       className={`
         inline-flex items-center justify-center
-        px-5 py-2 rounded-full
-        text-sm font-black tracking-wide
+        px-3 py-1 rounded-full
+        text-xs font-bold tracking-wide
         ${style.bg} ${style.text}
       `}
     >

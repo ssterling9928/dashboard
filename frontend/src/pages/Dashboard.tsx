@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Cpu, MemoryStick, HardDrive, Network, RefreshCw, Settings } from 'lucide-react'
+import { RefreshCw, Settings } from 'lucide-react'
 
 import TabBar from '../components/TabBar'
-import StatCard from '../components/StatCard'
+import HostStatRow from '../components/HostStatRow'
 import ServicesTab from '../components/ServicesTab'
 import PackagesTab from '../components/PackagesTab'
 import MonitoringTab from '../components/MonitoringTab'
@@ -15,8 +15,6 @@ import QuickLinksCard from '../components/QuickLinksCard'
 
 import { useServices } from '../hooks/useServices'
 import { usePackages } from '../hooks/usePackages'
-import { useMetrics } from '../hooks/useMetrics'
-import { useLogs } from '../hooks/useLogs'
 import { useStatus } from '../hooks/useStatus'
 
 type Tab = 'services' | 'packages' | 'monitoring' | 'logs'
@@ -28,8 +26,6 @@ export default function Dashboard() {
 
   const { data: services,  isLoading: servicesLoading  } = useServices()
   const { data: packages,  isLoading: packagesLoading  } = usePackages()
-  const { data: metrics,   isLoading: metricsLoading   } = useMetrics()
-  const { data: logs,      isLoading: logsLoading      } = useLogs()
   const { data: status,    isError:   statusError      } = useStatus()
 
   const now = new Date().toLocaleTimeString()
@@ -37,13 +33,13 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ── Top Header ── */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Dashboard HomePage</h1>
           <p className="text-xs text-gray-400">For monitoring my infrastructure and services</p>
         </div>
         <div className="flex items-center gap-3 text-sm text-gray-400">
-          <span>Last updated: {now}</span>
+          <span className="hidden sm:inline">Last updated: {now}</span>
           <button
             onClick={() => window.location.reload()}
             className="flex items-center gap-1 hover:text-gray-700 transition-colors"
@@ -56,43 +52,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="px-6 py-6 space-y-6">
+      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-6">
 
-        {/* ── Stat Cards ── */}
-        <div className="grid grid-cols-4 gap-4">
-          <StatCard
-            label="CPU Usage"
-            value={metrics ? `${metrics.cpu.current}${metrics.cpu.unit}` : '—'}
-            note={metricsLoading ? 'Loading...' : '4 cores / 4 threads'}
-            icon={<Cpu size={16} />}
-            percent={metrics?.cpu.current}
-          />
-          <StatCard
-            label="Memory"
-            value={metrics ? `${metrics.memory.current}${metrics.memory.unit}` : '—'}
-            subValue={metrics ? `/ ${metrics.memory.peak}${metrics.memory.unit}` : undefined}
-            note={metricsLoading ? 'Loading...' : `${metrics?.memory.average}% utilized`}
-            icon={<MemoryStick size={16} />}
-            percent={metrics?.memory.current}
-          />
-          <StatCard
-            label="Storage"
-            value={metrics ? `${metrics.storage.current}${metrics.storage.unit}` : '—'}
-            subValue={metrics ? `/ ${metrics.storage.peak}${metrics.storage.unit}` : undefined}
-            note={metricsLoading ? 'Loading...' : 'Available space'}
-            icon={<HardDrive size={16} />}
-            percent={metrics?.storage.current}
-          />
-          <StatCard
-            label="Network"
-            value={metrics ? `${metrics.network.current}${metrics.network.unit}` : '—'}
-            note={metricsLoading ? 'Loading...' : 'Bandwidth: 1 Gbps'}
-            icon={<Network size={16} />}
-          />
-        </div>
+        {/* ── Stat Cards: one row per host ── */}
+        <HostStatRow host="synology" />
+        <HostStatRow host="titan" />
 
-        {/* ── Main Content + Sidebar ── */}
-        <div className="flex gap-6">
+        {/* ── Main Content + Sidebar (sidebar drops below on smaller screens) ── */}
+        <div className="flex flex-col lg:flex-row gap-6">
 
           {/* ── Left: Tabs + Panel ── */}
           <div className="flex-1 min-w-0">
@@ -120,23 +87,18 @@ export default function Dashboard() {
               {activeTab === 'monitoring' && (
                 <MonitoringTab
                   cpu={{     label: 'CPU Usage',     type: 'cpu' }}
-                  disk={{    label: 'Disk Usage',    type: 'disk', params: '&volume=volume1' }}
+                  disk={{    label: 'Disk Usage',    type: 'disk' }}
                   network={{ label: 'Network Usage', type: 'network' }}
                 />
               )}
               {activeTab === 'logs' && (
-                logsLoading
-                  ? <p className="text-sm text-gray-400">Loading logs...</p>
-                  : <LogsTab
-                      logs={logs ?? []}
-                      grafanaUrl={import.meta.env.VITE_GRAFANA_URL}
-                    />
+                <LogsTab grafanaUrl={import.meta.env.VITE_GRAFANA_URL} />
               )}
             </div>
           </div>
 
           {/* ── Right: Sidebar ── */}
-          <div className="w-64 shrink-0 space-y-4">
+          <div className="grid gap-4 items-start content-start md:grid-cols-3 lg:grid-cols-1 lg:w-64 lg:shrink-0 lg:self-start">
 
             <SystemStatusCard status={status} isError={statusError} />
             <AlertsCard alerts={status?.alerts} />

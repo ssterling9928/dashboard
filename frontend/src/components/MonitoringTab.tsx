@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import type { Host } from '@shared/types'
 import MetricChart from './MetricChart'
+import HostToggle from './HostToggle'
 import { useMetric } from '../hooks/useMetrics'
+import { useHostSelection } from '../hooks/useHostSelection'
 
 interface MetricSection {
   label: string
@@ -39,9 +42,9 @@ function saveRange(type: string, hours: number) {
   }
 }
 
-function ChartSection({ section }: { section: MetricSection }) {
+function ChartSection({ section, host }: { section: MetricSection; host: Host }) {
   const [hours, setHours] = useState(() => loadRange(section.type))
-  const { data } = useMetric(section.type, hours, section.params)
+  const { data } = useMetric(section.type, hours, host, section.params)
   const subtitle = TIME_RANGES.find(r => r.hours === hours)?.subtitle ?? ''
 
   function handleRangeChange(value: number) {
@@ -51,7 +54,7 @@ function ChartSection({ section }: { section: MetricSection }) {
 
   return (
     <div className="mb-10">
-      <div className="flex items-start justify-between mb-1">
+      <div className="flex items-start justify-between gap-2 mb-1">
         <div>
           <h3 className="text-base font-semibold text-gray-900">{section.label}</h3>
           <p className="text-xs text-gray-400">{subtitle}</p>
@@ -97,11 +100,16 @@ function ChartSection({ section }: { section: MetricSection }) {
 }
 
 export default function MonitoringTab({ cpu, disk, network }: Props) {
+  const [host, setHost] = useHostSelection('monitoring-host')
+
   return (
     <div>
-      <ChartSection section={cpu} />
-      <ChartSection section={disk} />
-      <ChartSection section={network} />
+      <div className="mb-6">
+        <HostToggle value={host} onChange={setHost} />
+      </div>
+      <ChartSection section={cpu}     host={host} />
+      <ChartSection section={disk}    host={host} />
+      <ChartSection section={network} host={host} />
     </div>
   )
 }
