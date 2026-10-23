@@ -51,7 +51,7 @@ function ChartSection({ section, host }: { section: MetricSection; host: Host })
       {!data
         ? <p className="text-sm text-gray-400 dark:text-gray-500 h-[200px] flex items-center justify-center">Loading...</p>
         : <>
-            <MetricChart data={data} hours={hours} />
+            <MetricChart data={data} />
 
             <div className="flex items-center justify-around mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="text-center">

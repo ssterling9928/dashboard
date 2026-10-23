@@ -7,7 +7,7 @@ interface TabBarProps {
 
 const TABS: { label: string; value: Tab }[] = [
   { label: 'Containers',        value: 'services'   },
-  { label: 'Synology Packages', value: 'packages'   },
+  { label: 'Vault Packages',    value: 'packages'   },
   { label: 'Monitoring',        value: 'monitoring' },
   { label: 'Logs',              value: 'logs'       },
 ]

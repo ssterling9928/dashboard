@@ -14,7 +14,6 @@ import { useTheme } from '../hooks/useTheme'
 
 interface Props {
   data: MetricSummary
-  hours: number
 }
 
 // Recharts takes colors as props, so the dark: variant can't reach them
@@ -23,7 +22,7 @@ const COLORS = {
   dark:  { grid: '#1f2937', tick: '#6b7280', label: '#9ca3af', border: '#374151', bg: '#111827', line: '#818cf8' },
 }
 
-export default function MetricChart({ data, hours }: Props) {
+export default function MetricChart({ data }: Props) {
   const isPercent = data.unit === '%'
   const [theme] = useTheme()
   const c = COLORS[theme]
@@ -37,7 +36,7 @@ export default function MetricChart({ data, hours }: Props) {
         <CartesianGrid strokeDasharray="3 3" stroke={c.grid} vertical={false} />
         <XAxis
           dataKey="time"
-          tickFormatter={(t) => formatTick(t, hours)}
+          tickFormatter={(t) => formatTick(t)}
           minTickGap={40}
           tick={{ fontSize: 11, fill: c.tick }}
           axisLine={false}
