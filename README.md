@@ -122,6 +122,7 @@ dashboard/
 ├── backend/
 │   └── src/
 │       ├── server.ts              # Express app and route mounting
+│       ├── config/appLinks.ts     # which containers have a web app, and its subdomain
 │       ├── routes/
 │       │   ├── services.ts        # containers on both hosts, plus start/stop/restart
 │       │   ├── metrics.ts         # 30s poller, 24h buffers, ranges and averaging
