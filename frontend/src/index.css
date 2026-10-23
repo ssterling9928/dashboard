@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* dark: utilities follow the .dark class on <html> (set by useTheme), not the OS directly */
+@custom-variant dark (&:where(.dark, .dark *));
+
 body {
   margin: 0;
+}
+
+/* Native controls (selects, scrollbars) render dark too */
+html.dark {
+  color-scheme: dark;
 }

@@ -6,18 +6,19 @@ interface Props {
   color?: string // optional override
 }
 
-// assign colors to statuses
+// assign colors to statuses (dark mode uses softer tinted versions)
 const colorMap: Record<string, { bg: string; text: string }> = {
-  Healthy: { bg: 'bg-[#33FF00]', text: 'text-black' },
-  Warning: { bg: 'bg-[#FFFF00]', text: 'text-black' },
-  Down:    { bg: 'bg-[#FF3333]', text: 'text-black' },
-  Running: { bg: 'bg-[#33FF00]', text: 'text-black' },
-  Stopped: { bg: 'bg-[#FF3333]', text: 'text-black' },
-  Paused:  { bg: 'bg-[#FFFF00]', text: 'text-black' },
+  Healthy: { bg: 'bg-[#33FF00] dark:bg-green-500/20', text: 'text-black dark:text-green-300' },
+  Warning: { bg: 'bg-[#FFFF00] dark:bg-yellow-400/20', text: 'text-black dark:text-yellow-200' },
+  Down:    { bg: 'bg-[#FF3333] dark:bg-red-500/20', text: 'text-black dark:text-red-300' },
+  Running: { bg: 'bg-[#33FF00] dark:bg-green-500/20', text: 'text-black dark:text-green-300' },
+  Stopped: { bg: 'bg-[#FF3333] dark:bg-red-500/20', text: 'text-black dark:text-red-300' },
+  Exited:  { bg: 'bg-[#FF3333] dark:bg-red-500/20', text: 'text-black dark:text-red-300' },
+  Paused:  { bg: 'bg-[#FFFF00] dark:bg-yellow-400/20', text: 'text-black dark:text-yellow-200' },
 }
 
 // assign fallback color 
-const fallback = { bg: 'bg-gray-300', text: 'text-black' }
+const fallback = { bg: 'bg-gray-300 dark:bg-gray-700', text: 'text-black dark:text-gray-200' }
 
 // capitalize first letter
 function capitalize(s: string) {

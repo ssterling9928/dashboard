@@ -41,6 +41,7 @@ Each host is reached a different way, and the backend combines them all into one
 - **Logs** for each host: Vault's DSM system log, and Titan's container logs from Loki. Identical lines in a row are merged into one row with a count.
 - **Synology packages,** with their version, status, install path and size.
 - **Responsive layout:** the sidebar moves below the main area, grids reduce their columns, and log rows wrap on small screens.
+- **Dark mode:** follows the OS setting until you pick a theme with the header toggle, then remembers your choice. The theme is applied before the page first draws, so it doesn't flash light on refresh. The charts switch color palettes too.
 
 ---
 
@@ -142,7 +143,7 @@ dashboard/
 │       ├── pages/Dashboard.tsx
 │       ├── components/            # cards, tabs, charts, modals, badges
 │       ├── hooks/                 # TanStack Query hooks for each endpoint
-│       ├── utils/                 # formatting, log collapsing, saved ranges (unit-tested)
+│       ├── utils/                 # formatting, log collapsing, saved ranges, theme (unit-tested)
 │       └── config/quickLinks.ts
 └── shared/
     └── types.ts                   # API data shapes shared by both sides
@@ -208,11 +209,11 @@ npx tsx titan-helper.ts                 # or run it as a systemd service
 
 ## Testing
 
-The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and averaging, the Docker, syslog and SNMP parsers, and the frontend's log collapsing and formatting.
+The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and averaging, the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
 cd backend  && npm test     # 48 tests
-cd frontend && npm test     # 13 tests
+cd frontend && npm test     # 19 tests
 ```
 
 ---
@@ -225,7 +226,7 @@ cd frontend && npm test     # 13 tests
 - [ ] Dockerfile and Compose for the dashboard, and the systemd unit for the helper
 - [ ] Token authentication for the helper agents
 - [ ] Metric history that survives restarts (Prometheus), for 7-day charts
-- [ ] Dark mode
+- [x] Dark mode
 
 ---
 

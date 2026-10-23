@@ -14,7 +14,7 @@ const colorMap: Record<string, { bg: string; text: string }> = {
 }
 
 // assign fallback color
-const fallback = { bg: 'bg-gray-300', text: 'text-black' }
+const fallback = { bg: 'bg-gray-300 dark:bg-gray-700', text: 'text-black dark:text-gray-200' }
 
 // capitalize first letter
 function capitalize(s: string) {

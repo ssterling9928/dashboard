@@ -7,15 +7,15 @@ interface Props {
   level: string
 }
 
-// assign colors to variants 
+// assign colors to variants (dark mode uses softer tinted versions)
 const colorMap: Record<LogLevel, { bg: string; text: string }> = {
-  Error:   { bg: 'bg-[#F4AAAA]', text: 'text-black' },
-  Warning: { bg: 'bg-[#F9F4A8]', text: 'text-black' },
-  Info:    { bg: 'bg-[#C5C8F0]', text: 'text-black' },
+  Error:   { bg: 'bg-[#F4AAAA] dark:bg-red-500/20',    text: 'text-black dark:text-red-300' },
+  Warning: { bg: 'bg-[#F9F4A8] dark:bg-yellow-400/20', text: 'text-black dark:text-yellow-200' },
+  Info:    { bg: 'bg-[#C5C8F0] dark:bg-indigo-400/20', text: 'text-black dark:text-indigo-200' },
 }
 
 // assign fallback color 
-const fallback = { bg: 'bg-gray-200', text: 'text-black' }
+const fallback = { bg: 'bg-gray-200 dark:bg-gray-700', text: 'text-black dark:text-gray-200' }
 
 // capitalize first letter 
 function capitalize(s: string) {

@@ -10,14 +10,23 @@ import {
 } from 'recharts'
 import type { MetricSummary } from '@shared/types'
 import { formatTick, formatTooltipLabel } from '../utils/format'
+import { useTheme } from '../hooks/useTheme'
 
 interface Props {
   data: MetricSummary
   hours: number
 }
 
+// Recharts takes colors as props, so the dark: variant can't reach them
+const COLORS = {
+  light: { grid: '#f0f0f0', tick: '#9ca3af', label: '#6b7280', border: '#e5e7eb', bg: '#ffffff', line: '#4f46e5' },
+  dark:  { grid: '#1f2937', tick: '#6b7280', label: '#9ca3af', border: '#374151', bg: '#111827', line: '#818cf8' },
+}
+
 export default function MetricChart({ data, hours }: Props) {
   const isPercent = data.unit === '%'
+  const [theme] = useTheme()
+  const c = COLORS[theme]
 
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -25,18 +34,18 @@ export default function MetricChart({ data, hours }: Props) {
         data={data.history}
         margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={c.grid} vertical={false} />
         <XAxis
           dataKey="time"
           tickFormatter={(t) => formatTick(t, hours)}
           minTickGap={40}
-          tick={{ fontSize: 11, fill: '#9ca3af' }}
+          tick={{ fontSize: 11, fill: c.tick }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
           domain={isPercent ? [0, 100] : ['auto', 'auto']}
-          tick={{ fontSize: 11, fill: '#9ca3af' }}
+          tick={{ fontSize: 11, fill: c.tick }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => `${v}${data.unit}`}
@@ -47,9 +56,10 @@ export default function MetricChart({ data, hours }: Props) {
             return [`${Number(value)}${data.unit}`, '']
           }}
           labelFormatter={(t) => formatTooltipLabel(String(t))}
-          labelStyle={{ color: '#6b7280', fontSize: 11 }}
+          labelStyle={{ color: c.label, fontSize: 11 }}
           contentStyle={{
-            border: '1px solid #e5e7eb',
+            border: `1px solid ${c.border}`,
+            backgroundColor: c.bg,
             borderRadius: '8px',
             fontSize: 12,
           }}
@@ -57,10 +67,10 @@ export default function MetricChart({ data, hours }: Props) {
         <Line
           type="linear"
           dataKey="value"
-          stroke="#4f46e5"
+          stroke={c.line}
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4, fill: '#4f46e5' }}
+          activeDot={{ r: 4, fill: c.line }}
         />
       </LineChart>
     </ResponsiveContainer>
