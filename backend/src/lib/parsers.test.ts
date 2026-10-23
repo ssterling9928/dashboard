@@ -77,8 +77,25 @@ describe('splitServiceId', () => {
 })
 
 describe('buildServiceUrl', () => {
-  it('uses the {name}.home pattern', () => {
+  it('links apps whose subdomain matches the container name', () => {
     expect(buildServiceUrl('grafana')).toBe('https://grafana.home.sterling-dev.com')
+  })
+
+  it('uses the configured subdomain when it differs from the name', () => {
+    expect(buildServiceUrl('vs-code-editor')).toBe('https://code.home.sterling-dev.com')
+    expect(buildServiceUrl('it-tools')).toBe('https://tools.home.sterling-dev.com')
+    expect(buildServiceUrl('service-status-frontend')).toBe('https://docker.home.sterling-dev.com')
+  })
+
+  it('returns null for containers without a web app, including unlisted ones', () => {
+    for (const name of ['loki', 'node-exporter', 'portainer_agent', 'service-status-backend', 'brand-new-container']) {
+      expect(buildServiceUrl(name)).toBeNull()
+    }
+  })
+
+  it('does not treat built-in object keys as container names', () => {
+    expect(buildServiceUrl('constructor')).toBeNull()
+    expect(buildServiceUrl('toString')).toBeNull()
   })
 })
 

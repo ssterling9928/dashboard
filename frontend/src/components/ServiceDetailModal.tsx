@@ -184,7 +184,7 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
 
               {/* Network */}
               <Section title="Network">
-                <DetailRow label="URL"   value={service.Url} />
+                {service.Url && <DetailRow label="URL" value={service.Url} />}
                 <DetailRow label="Ports" value={service.Ports?.join(', ') || 'None'} />
               </Section>
 
@@ -199,12 +199,14 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
               {/* Tools */}
               <Section title="Tools">
                 <div className="flex flex-col gap-2.5 mt-1">
-                  <ToolButton
-                    label="Open App"
-                    buttonText="Open"
-                    href={service.Url}
-                    variant="green"
-                  />
+                  {service.Url && (
+                    <ToolButton
+                      label="Open App"
+                      buttonText="Open"
+                      href={service.Url}
+                      variant="green"
+                    />
+                  )}
                   <ToolButton
                     label="Check Logs"
                     buttonText="Logs"

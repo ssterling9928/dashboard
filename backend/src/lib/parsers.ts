@@ -1,9 +1,12 @@
+import { APP_DOMAIN, APP_SUBDOMAINS } from '../config/appLinks.js'
 import type { Host, LogEntry } from '../types/types.js'
 
 // ── Containers ────────────────────────────────────────────
 
-export function buildServiceUrl(name: string): string {
-  return `https://${name}.home.sterling-dev.com`
+// URL of the container's web app, or null if it doesn't have one (see config/appLinks.ts)
+export function buildServiceUrl(name: string): string | null {
+  const subdomain = Object.hasOwn(APP_SUBDOMAINS, name) ? APP_SUBDOMAINS[name] : undefined
+  return subdomain ? `https://${subdomain}.${APP_DOMAIN}` : null
 }
 
 export function parseStatus(state: string): string {

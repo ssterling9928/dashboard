@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, Settings } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 
 import TabBar from '../components/TabBar'
 import HostStatRow from '../components/HostStatRow'
@@ -48,9 +48,6 @@ export default function Dashboard() {
             <RefreshCw size={14} /> Refresh
           </button>
           <ThemeToggle />
-          <button className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
-            <Settings size={16} />
-          </button>
         </div>
       </div>
 

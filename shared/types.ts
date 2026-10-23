@@ -19,7 +19,7 @@ export interface ServiceDetail extends Service {
   Ports:         string[]
   Started:       string
   Restarts:      number
-  Url:           string
+  Url:           string | null   // null when the container has no web app
   Networks:      string[]
 }
 
