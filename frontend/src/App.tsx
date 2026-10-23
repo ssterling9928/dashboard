@@ -8,7 +8,7 @@ const basename = import.meta.env.VITE_BASE_PATH ?? '/proxy/5173'
 export default function App() {
   return (
     <BrowserRouter basename={basename}>
-      <div className="min-h-screen bg-[#f8f8f7]">
+      <div className="min-h-screen bg-[#f8f8f7] dark:bg-gray-950">
         <Routes>
           <Route path="/" element={<Dashboard />} />
         </Routes>

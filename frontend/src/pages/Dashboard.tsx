@@ -12,6 +12,7 @@ import PackageDetailModal from '../components/PackageDetailModal'
 import SystemStatusCard from '../components/SystemStatusCard'
 import AlertsCard from '../components/AlertsCard'
 import QuickLinksCard from '../components/QuickLinksCard'
+import ThemeToggle from '../components/ThemeToggle'
 
 import { useServices } from '../hooks/useServices'
 import { usePackages } from '../hooks/usePackages'
@@ -31,22 +32,23 @@ export default function Dashboard() {
   const now = new Date().toLocaleTimeString()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* ── Top Header ── */}
-      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard HomePage</h1>
-          <p className="text-xs text-gray-400">For monitoring my infrastructure and services</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Homelab Monitoring</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">For monitoring my infrastructure and services</p>
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-400">
+        <div className="flex items-center gap-3 text-sm text-gray-400 dark:text-gray-500">
           <span className="hidden sm:inline">Last updated: {now}</span>
           <button
             onClick={() => window.location.reload()}
-            className="flex items-center gap-1 hover:text-gray-700 transition-colors"
+            className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           >
             <RefreshCw size={14} /> Refresh
           </button>
-          <button className="hover:text-gray-700 transition-colors">
+          <ThemeToggle />
+          <button className="hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
             <Settings size={16} />
           </button>
         </div>
@@ -67,10 +69,10 @@ export default function Dashboard() {
               <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
               {activeTab === 'services' && (
                 servicesLoading
-                  ? <p className="text-sm text-gray-400">Loading services...</p>
+                  ? <p className="text-sm text-gray-400 dark:text-gray-500">Loading services...</p>
                   : <ServicesTab
                       services={services ?? []}
                       onSelectService={setSelectedServiceId}
@@ -78,7 +80,7 @@ export default function Dashboard() {
               )}
               {activeTab === 'packages' && (
                 packagesLoading
-                  ? <p className="text-sm text-gray-400">Loading packages...</p>
+                  ? <p className="text-sm text-gray-400 dark:text-gray-500">Loading packages...</p>
                   : <PackagesTab
                       packages={packages ?? []}
                       onSelectPackage={setSelectedPackageId}
