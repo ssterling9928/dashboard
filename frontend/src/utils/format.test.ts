@@ -11,10 +11,16 @@ import {
 const TIME = '2026-10-21T19:35:00.000Z'
 
 describe('chart time formatting', () => {
-  it('shows minutes for short ranges and whole hours for long ones', () => {
-    expect(formatTick(TIME, 1, 'en-US')).toBe('2:35 PM')
-    expect(formatTick(TIME, 6, 'en-US')).toBe('2:35 PM')
-    expect(formatTick(TIME, 24, 'en-US')).toBe('2 PM')
+  it('always shows hours and minutes on the axis', () => {
+    expect(formatTick(TIME, 'en-US')).toBe('2:35 PM')
+  })
+
+  it('gives readings within the same hour distinct axis labels', () => {
+    // Regression: with hour-only labels, an hour of data on the 24h range read "3 PM" on every tick
+    const labels = ['2026-10-21T20:05:00Z', '2026-10-21T20:25:00Z', '2026-10-21T20:45:00Z']
+      .map(t => formatTick(t, 'en-US'))
+    expect(new Set(labels).size).toBe(3)
+    expect(labels).toEqual(['3:05 PM', '3:25 PM', '3:45 PM'])
   })
 
   it('shows weekday, date and time in the tooltip', () => {

@@ -2,11 +2,12 @@ import type { HostStatus } from '@shared/types'
 
 // `locales` defaults to the browser's locale; tests pass a fixed one
 
-// Chart axis: "2:35 PM" for short ranges, "2 PM" once the chart spans many hours
-export function formatTick(time: string, hours: number, locales: Intl.LocalesArgument = []): string {
-  return new Date(time).toLocaleTimeString(locales, hours > 6
-    ? { hour: 'numeric' }
-    : { hour: 'numeric', minute: '2-digit' })
+// Chart axis: always "2:35 PM". Hour-only labels ("3 PM") repeat whenever two
+// ticks fall in the same hour — which depends on how much history exists and
+// how wide the chart is, not on the selected range. The chart's minTickGap
+// already thins labels so they don't overlap.
+export function formatTick(time: string, locales: Intl.LocalesArgument = []): string {
+  return new Date(time).toLocaleTimeString(locales, { hour: 'numeric', minute: '2-digit' })
 }
 
 // Chart tooltip: "Tue, Oct 21, 2:35 PM"

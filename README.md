@@ -16,14 +16,7 @@ A single-page dashboard for my homelab. It shows the containers, metrics, logs a
 
 Each host is reached a different way, and the backend combines them all into one consistent API. The React frontend shows the result as one dashboard, which works on both desktop and mobile.
 
-<!--
-  Screenshots: add docs/screenshots/desktop.png and docs/screenshots/mobile.png, then replace this comment with:
-
-  <p align="center">
-    <img src="docs/screenshots/desktop.png" alt="Dashboard on desktop" width="75%">
-    <img src="docs/screenshots/mobile.png" alt="Dashboard on mobile" width="22%">
-  </p>
--->
+<!-- Screenshots: see docs/screenshots/ (added separately) -->
 
 ---
 
