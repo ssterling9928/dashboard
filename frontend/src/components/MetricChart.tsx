@@ -7,6 +7,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  ReferenceLine,
 } from 'recharts'
 import type { MetricSummary } from '@shared/types'
 import { formatTick, formatTooltipLabel } from '../utils/format'
@@ -18,14 +19,18 @@ interface Props {
 
 // Recharts takes colors as props, so the dark: variant can't reach them
 const COLORS = {
-  light: { grid: '#f0f0f0', tick: '#9ca3af', label: '#6b7280', border: '#e5e7eb', bg: '#ffffff', line: '#4f46e5' },
-  dark:  { grid: '#1f2937', tick: '#6b7280', label: '#9ca3af', border: '#374151', bg: '#111827', line: '#818cf8' },
+  light: { grid: '#f0f0f0', tick: '#9ca3af', label: '#6b7280', border: '#e5e7eb', bg: '#ffffff', line: '#4f46e5', peak: '#9ca3af' },
+  dark:  { grid: '#1f2937', tick: '#6b7280', label: '#9ca3af', border: '#374151', bg: '#111827', line: '#818cf8', peak: '#6b7280' },
 }
 
 export default function MetricChart({ data }: Props) {
   const isPercent = data.unit === '%'
   const [theme] = useTheme()
   const c = COLORS[theme]
+
+  // Marks the highest reading in the range. Label sits above the line, or
+  // below it when that would clip off the top.
+  const peakLabelPosition = isPercent && data.peak > 85 ? 'insideTopRight' : 'insideBottomRight'
 
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -63,6 +68,20 @@ export default function MetricChart({ data }: Props) {
             fontSize: 12,
           }}
         />
+        {data.history.length > 0 && (
+          <ReferenceLine
+            y={data.peak}
+            stroke={c.peak}
+            strokeDasharray="4 4"
+            ifOverflow="extendDomain"
+            label={{
+              value: `Peak ${data.peak}${data.unit}`,
+              position: peakLabelPosition,
+              fill: c.label,
+              fontSize: 11,
+            }}
+          />
+        )}
         <Line
           type="linear"
           dataKey="value"
