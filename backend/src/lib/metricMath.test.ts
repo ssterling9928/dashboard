@@ -67,11 +67,11 @@ describe('downsample', () => {
     expect(result).toHaveLength(288)
   })
 
-  it('averages each bucket and keeps the bucket\'s newest timestamp', () => {
-    // 2880 points → buckets of 10; first bucket is values 0..9
-    const points = series(2880, POLL_INTERVAL_MS, i => i)
+  it('keeps each bucket\'s highest reading and newest timestamp', () => {
+    // 2880 points → buckets of 10; first bucket is values 9..0, highest first
+    const points = series(2880, POLL_INTERVAL_MS, i => 9 - (i % 10))
     const [first] = downsample(points, n => n)
-    expect(first!.value).toBe(4.5)
+    expect(first!.value).toBe(9)
     expect(first!.time).toBe(points[9]!.time)
   })
 })
@@ -89,12 +89,13 @@ describe('summarizePoints', () => {
     expect(summary).toMatchObject({ current: 60, average: 30, peak: 60, unit: '%' })
   })
 
-  it('takes the peak from raw readings, not the downsampled chart', () => {
-    // One 100% spike in a full day of 10% — averaging would hide it in the chart
+  it('keeps a short spike at full height in the downsampled chart', () => {
+    // One 100% reading in a full day of 10% — averaging would have hidden it
     const points = series(2880, POLL_INTERVAL_MS, i => (i === 1000 ? 100 : 10))
     const summary = summarizePoints(points, 24, '%', NOW)
     expect(summary.peak).toBe(100)
-    expect(Math.max(...summary.history.map(p => p.value))).toBeLessThan(100)
+    expect(Math.max(...summary.history.map(p => p.value))).toBe(100)
+    expect(summary.average).toBe(10)
   })
 
   it('rounds percentages to whole numbers and other units to 2 decimals', () => {

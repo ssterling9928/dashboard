@@ -24,7 +24,7 @@ Each host is reached a different way, and the backend combines them all into one
 
 - **Containers from both hosts in one list.** Each card has a host badge and a status badge. A detail view shows the image, ports, networks, restart policy and uptime, and you can **start, stop and restart** containers from it.
 - **Stat cards for each host.** CPU, memory, storage and network, each with its 24-hour average and peak.
-- **Monitoring charts** with a Vault / Titan switch and 1h / 6h / 24h ranges. Longer ranges are averaged down so the charts stay readable.
+- **Monitoring charts** with a Vault / Titan switch and 1h / 6h / 24h ranges. Longer ranges are thinned out so the charts stay readable, keeping the highest reading from each slice so short spikes still show. A dashed line marks the peak.
 - **Live system status** for each host: online or offline, model, uptime, load average and containers running.
 - **Active alerts** produced by the backend:
   - a host or helper that can't be reached
@@ -83,8 +83,8 @@ flowchart LR
 **A helper agent instead of mounting the Docker socket.**
 The simplest way to manage Titan's containers would be to mount `/var/run/docker.sock` into the dashboard container. But that gives a web-facing container root-level control of the host. Instead, a small Express agent runs on the host under systemd. It offers only a fixed set of endpoints, checks container names against an allow-list pattern, and listens only on the Docker bridge gateway address. Containers on that network can reach it, but the rest of the LAN can't. The same pattern already existed for the NAS (`host-helper.ts` wrapping `synopkg`), so both hosts work the same way.
 
-**One poll, kept in memory, with averaging for charts.**
-The backend polls every source once every 30 seconds and keeps a 24-hour buffer for each metric (2,880 readings). Requests are answered from memory, so the charts never wait on SNMP. Ranges are selected by timestamp, and long ranges are averaged down to at most 288 points. Current, average and peak values are still calculated from every reading.
+**One poll, kept in memory, thinned out for charts.**
+The backend polls every source once every 30 seconds and keeps a 24-hour buffer for each metric (2,880 readings). Requests are answered from memory, so the charts never wait on SNMP. Ranges are selected by timestamp, and long ranges are reduced to at most 288 points by keeping the highest reading from each group, so a 30-second spike isn't averaged away. Current, average and peak values are still calculated from every reading.
 
 **Alerts come from data the backend already has.**
 Status and alerts are worked out from the poll results already in memory, plus one container listing per request. The rules are pure functions in [`alerts.ts`](backend/src/lib/alerts.ts). Thresholds and the meaning of each Synology status code are plain constants there, so each rule is easy to read, change and test.
@@ -118,13 +118,13 @@ dashboard/
 │       ├── config/appLinks.ts     # which containers have a web app, and its subdomain
 │       ├── routes/
 │       │   ├── services.ts        # containers on both hosts, plus start/stop/restart
-│       │   ├── metrics.ts         # 30s poller, 24h buffers, ranges and averaging
+│       │   ├── metrics.ts         # 30s poller, 24h buffers, ranges and downsampling
 │       │   ├── status.ts          # per-host status and alerts endpoint
 │       │   ├── logs.ts            # DSM syslog (Vault) and Loki (Titan)
 │       │   └── packages.ts        # Synology packages via the NAS helper
 │       └── lib/
 │           ├── alerts.ts          # alert rules and thresholds (pure, unit-tested)
-│           ├── metricMath.ts      # range selection, averaging, summaries (pure, unit-tested)
+│           ├── metricMath.ts      # range selection, downsampling, summaries (pure, unit-tested)
 │           ├── parsers.ts         # Docker, syslog and timestamp parsers (pure, unit-tested)
 │           ├── synology.ts        # DSM Web API client with session refresh
 │           ├── snmp.ts            # SNMP get/walk and OID definitions
@@ -203,11 +203,11 @@ npx tsx titan-helper.ts                 # or run it as a systemd service
 
 ## Testing
 
-The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and averaging, the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
+The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
-cd backend  && npm test     # 48 tests
-cd frontend && npm test     # 19 tests
+cd backend  && npm test     # 51 tests
+cd frontend && npm test     # 20 tests
 ```
 
 ---
