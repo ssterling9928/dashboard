@@ -3,6 +3,10 @@ import { getJson, postJson } from './http.js'
 const TITAN_HELPER_URL =
   process.env.TITAN_HELPER_URL?.replace(/\/+$/, '') ?? 'http://YOUR_TITAN_IP:4222'
 
+// Full-access token in production; dev uses the helper's read-only token,
+// so start/stop/restart return 403 there
+const AUTH = { Authorization: `Bearer ${process.env.TITAN_HELPER_TOKEN ?? ''}` }
+
 export interface TitanContainerSummary {
   name:   string
   image:  string
@@ -52,20 +56,20 @@ export interface TitanSystemMetrics {
 }
 
 export async function getTitanContainers(): Promise<TitanContainerSummary[]> {
-  return getJson<TitanContainerSummary[]>(`${TITAN_HELPER_URL}/containers`)
+  return getJson<TitanContainerSummary[]>(`${TITAN_HELPER_URL}/containers`, undefined, AUTH)
 }
 
 export async function getTitanContainer(name: string): Promise<TitanContainerInspect> {
-  return getJson<TitanContainerInspect>(`${TITAN_HELPER_URL}/containers/${encodeURIComponent(name)}`)
+  return getJson<TitanContainerInspect>(`${TITAN_HELPER_URL}/containers/${encodeURIComponent(name)}`, undefined, AUTH)
 }
 
 export async function titanContainerAction(
   name: string,
   action: 'start' | 'stop' | 'restart'
 ): Promise<void> {
-  await postJson(`${TITAN_HELPER_URL}/containers/${encodeURIComponent(name)}/${action}`)
+  await postJson(`${TITAN_HELPER_URL}/containers/${encodeURIComponent(name)}/${action}`, undefined, AUTH)
 }
 
 export async function getTitanSystemMetrics(): Promise<TitanSystemMetrics> {
-  return getJson<TitanSystemMetrics>(`${TITAN_HELPER_URL}/system`)
+  return getJson<TitanSystemMetrics>(`${TITAN_HELPER_URL}/system`, undefined, AUTH)
 }
