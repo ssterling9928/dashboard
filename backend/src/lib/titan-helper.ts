@@ -3,6 +3,7 @@ import express from 'express'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
+import { createHash, timingSafeEqual } from 'node:crypto'
 
 const app = express()
 
@@ -11,7 +12,49 @@ const HOST = process.env.TITAN_HELPER_HOST ?? '0.0.0.0'
 const DOCKER = process.env.DOCKER_PATH ?? 'docker'
 const NET_IFACE = process.env.TITAN_NET_IFACE ?? 'eth0'
 
+// Every route but /health needs a bearer token. TITAN_HELPER_TOKEN allows
+// everything (the production dashboard); TITAN_HELPER_READ_TOKEN, if set,
+// allows only GETs (dev), so it can't start or stop containers.
+const TOKEN = process.env.TITAN_HELPER_TOKEN ?? ''
+const READ_TOKEN = process.env.TITAN_HELPER_READ_TOKEN ?? ''
+const MIN_TOKEN_LENGTH = 32
+
+if (TOKEN.length < MIN_TOKEN_LENGTH) {
+  console.error(`TITAN_HELPER_TOKEN must be set to at least ${MIN_TOKEN_LENGTH} characters (openssl rand -hex 32)`)
+  process.exit(1)
+}
+if (READ_TOKEN && READ_TOKEN.length < MIN_TOKEN_LENGTH) {
+  console.error(`TITAN_HELPER_READ_TOKEN must be at least ${MIN_TOKEN_LENGTH} characters if set`)
+  process.exit(1)
+}
+if (READ_TOKEN && READ_TOKEN === TOKEN) {
+  console.error('TITAN_HELPER_READ_TOKEN must differ from TITAN_HELPER_TOKEN')
+  process.exit(1)
+}
+
 const execFileAsync = promisify(execFile)
+
+// Compare digests so the comparison takes the same time whatever the input
+function tokenMatches(given: string, expected: string): boolean {
+  if (!expected) return false
+  const a = createHash('sha256').update(given).digest()
+  const b = createHash('sha256').update(expected).digest()
+  return timingSafeEqual(a, b)
+}
+
+app.use((req, res, next) => {
+  if (req.path === '/health') return next()
+
+  const header = req.get('authorization') ?? ''
+  const given = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : ''
+
+  if (tokenMatches(given, TOKEN)) return next()
+  if (tokenMatches(given, READ_TOKEN)) {
+    if (req.method === 'GET') return next()
+    return res.status(403).json({ error: 'Read-only token' })
+  }
+  res.status(401).json({ error: 'Unauthorized' })
+})
 
 function assertContainerName(name: string): void {
   if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name)) {

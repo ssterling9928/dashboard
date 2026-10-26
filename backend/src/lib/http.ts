@@ -1,10 +1,14 @@
-export async function getJson<T>(url: string, timeoutMs = 10000): Promise<T> {
+export async function getJson<T>(
+  url: string,
+  timeoutMs = 10000,
+  headers: Record<string, string> = {},
+): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...headers },
       signal: controller.signal,
     })
 
@@ -20,14 +24,18 @@ export async function getJson<T>(url: string, timeoutMs = 10000): Promise<T> {
   }
 }
 
-export async function postJson<T>(url: string, timeoutMs = 10000): Promise<T> {
+export async function postJson<T>(
+  url: string,
+  timeoutMs = 10000,
+  headers: Record<string, string> = {},
+): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...headers },
       signal: controller.signal,
     })
 

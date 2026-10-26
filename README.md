@@ -81,7 +81,7 @@ flowchart LR
 ## Design decisions
 
 **A helper agent instead of mounting the Docker socket.**
-The simplest way to manage Titan's containers would be to mount `/var/run/docker.sock` into the dashboard container. But that gives a web-facing container root-level control of the host. Instead, a small Express agent runs on the host under systemd. It offers only a fixed set of endpoints, checks container names against an allow-list pattern, and listens only on the Docker bridge gateway address. Containers on that network can reach it, but the rest of the LAN can't. The same pattern already existed for the NAS (`host-helper.ts` wrapping `synopkg`), so both hosts work the same way.
+The simplest way to manage Titan's containers would be to mount `/var/run/docker.sock` into the dashboard container. But that gives a web-facing container root-level control of the host. Instead, a small Express agent runs on the host under systemd. It offers only a fixed set of endpoints, checks container names against an allow-list pattern, requires a bearer token on every request (a read-only token can be issued for dev), and listens only on the Docker bridge gateway address. Containers on that network can reach it, but the rest of the LAN can't. The same pattern already existed for the NAS (`host-helper.ts` wrapping `synopkg`), so both hosts work the same way.
 
 **One poll, kept in memory, thinned out for charts.**
 The backend polls every source once every 30 seconds and keeps a 24-hour buffer for each metric (2,880 readings). Requests are answered from memory, so the charts never wait on SNMP. Ranges are selected by timestamp, and long ranges are reduced to at most 288 points by keeping the highest reading from each group, so a 30-second spike isn't averaged away. Current, average and peak values are still calculated from every reading.
@@ -178,6 +178,7 @@ SNMP_HOST=<nas-ip>
 SNMP_COMMUNITY=<community>
 SYNO_HELPER_URL=http://<nas-ip>:4111
 TITAN_HELPER_URL=http://<docker-gateway-ip>:4222
+TITAN_HELPER_TOKEN=<token>      # the helper's full token in production, its read-only token in dev
 LOKI_URL=http://loki:3100
 ```
 
@@ -220,6 +221,8 @@ VITE_API_URL=/proxy/4000
 TITAN_HELPER_PORT=4222
 TITAN_HELPER_HOST=<docker-gateway-ip>   # listen only on the Docker bridge
 TITAN_NET_IFACE=<host-nic>              # e.g. ens18
+TITAN_HELPER_TOKEN=<openssl rand -hex 32>        # required; full access, for the production dashboard
+TITAN_HELPER_READ_TOKEN=<openssl rand -hex 32>   # optional; GET only, for dev (can't start/stop)
 
 npm install express dotenv tsx
 npx tsx titan-helper.ts                 # or run it as a systemd service
