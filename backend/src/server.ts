@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import express from "express";
 import cors from "cors";
-import { synoRequest } from './lib/synology.js'
+import path from "path";
 import servicesRouter from "./routes/services.js"
 import metricsRouter from "./routes/metrics.js"
 import logsRouter from "./routes/logs.js"
@@ -35,16 +35,17 @@ app.use('/api/logs', logsRouter)
 app.use('/api/packages', packagesRouter)
 app.use('/api/status', statusRouter)
 
-app.get('/api/debug', async (_req, res, next) => {
-  try {
-    const data = await synoRequest('SYNO.API.Info', 'query', 1, {
-      query: 'all'
-    })
-    res.json(data)
-  } catch (err) {
-    next(err)
-  }
-})
+// In the Docker image the backend also serves the built frontend, so the
+// dashboard is one container on one port. STATIC_DIR is unset in dev, where
+// Vite serves the frontend.
+const STATIC_DIR = process.env.STATIC_DIR
+if (STATIC_DIR) {
+  app.use(express.static(STATIC_DIR))
+  app.get('/{*path}', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next()
+    res.sendFile(path.resolve(STATIC_DIR, 'index.html'))
+  })
+}
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack)

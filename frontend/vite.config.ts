@@ -44,6 +44,11 @@ export default defineConfig(({ mode }) => {
             protocol: 'wss',
           }
         : undefined,
+      // With no VITE_API_URL the frontend calls "/api/..." on its own origin
+      // (as in the Docker image), so forward those to the dev backend
+      proxy: {
+        '/api': 'http://localhost:4000',
+      },
     },
     resolve: {
       alias: {

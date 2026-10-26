@@ -138,9 +138,13 @@ dashboard/
 │       ├── components/            # cards, tabs, charts, modals, badges
 │       ├── hooks/                 # TanStack Query hooks for each endpoint
 │       ├── utils/                 # formatting, log collapsing, saved ranges, theme (unit-tested)
-│       └── config/quickLinks.ts
-└── shared/
-    └── types.ts                   # API data shapes shared by both sides
+│       └── config/                # sidebar quick links, API base URL
+├── shared/
+│   └── types.ts                   # API data shapes shared by both sides
+├── scripts/dev.sh                 # dev mode: backend and Vite together
+├── package.json                   # npm run dev / deploy / test
+├── Dockerfile                     # builds both, runs the backend serving the frontend
+└── docker-compose.yml             # the container on the "private" network
 ```
 
 ---
@@ -177,14 +181,36 @@ TITAN_HELPER_URL=http://<docker-gateway-ip>:4222
 LOKI_URL=http://loki:3100
 ```
 
+There are two ways to run it, and they don't interfere with each other. Each has its own backend and its own in-memory history.
+
+| | Container | Dev |
+|---|---|---|
+| Command (repo root) | `npm run deploy` | `npm run dev` |
+| What runs | one container: the backend also serves the built frontend | `tsx watch` backend on :4000 and the Vite dev server on :5173 |
+| Picks up changes | on the next deploy | on save |
+| Used for | the dashboard you actually use | trying changes before deploying them |
+
+**Container** (on Titan, where Docker runs):
+
 ```bash
-cd backend && npm install && npm run dev
+npm run deploy          # docker compose up -d --build
 ```
 
-**Frontend:**
+`docker-compose.yml` reads `backend/backend.env`, sets the time zone, and joins the existing `private` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports: the dashboard has no login and can start and stop containers, so it's reached only through the reverse proxy. In Nginx Proxy Manager (also on `private`), forward to `http://homelab-dashboard:4000`.
+
+**Dev:**
 
 ```bash
-cd frontend && npm install && npm run dev
+npm --prefix backend install
+npm --prefix frontend install
+npm run dev             # Ctrl+C stops both
+```
+
+Open `http://localhost:5173`. Vite forwards `/api` to the dev backend. Behind a path-based proxy such as code-server's, give the frontend a `frontend/.env`:
+
+```env
+VITE_BASE_PATH=/proxy/5173
+VITE_API_URL=/proxy/4000
 ```
 
 **Titan helper:** runs on the Docker host. It needs Node 22 and access to the Docker CLI.
@@ -208,6 +234,7 @@ The parts most likely to hide bugs are kept as pure functions and unit-tested wi
 ```bash
 cd backend  && npm test     # 51 tests
 cd frontend && npm test     # 20 tests
+npm test                    # both, from the repo root
 ```
 
 ---

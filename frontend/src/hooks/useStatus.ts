@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { SystemStatus } from '@shared/types'
-
-const API = import.meta.env.VITE_API_URL || '/proxy/4000'
+import { API } from '../config/api'
 
 export function useStatus() {
   return useQuery<SystemStatus>({

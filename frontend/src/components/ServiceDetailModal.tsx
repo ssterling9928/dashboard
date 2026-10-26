@@ -5,8 +5,7 @@ import { useServiceDetail, containerAction } from '../hooks/useServices'
 import HealthBadge from './HealthBadge'
 import HostBadge from './HostBadge'
 import dockerIcon from '../assets/docker.png'
-
-const API = import.meta.env.VITE_API_URL || '/proxy/4000'
+import { API } from '../config/api'
 
 interface Props {
   serviceId: string | null
