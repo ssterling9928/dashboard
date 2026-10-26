@@ -2,6 +2,7 @@
 import { Router } from 'express'
 import { synoRequest } from '../lib/synology.js'
 import { getTitanContainers, getTitanContainer, titanContainerAction } from '../lib/titan.js'
+import { sanitizeInspect } from '../lib/inspect.js'
 import {
   buildServiceUrl,
   formatUptime,
@@ -175,11 +176,13 @@ router.get('/:id/inspect', async (req, res, next) => {
   try {
     const { host, name } = splitServiceId(req.params.id)
 
-    const data = host === 'synology'
-      ? await synoRequest('SYNO.Docker.Container', 'get', 1, { name })
+    // DSM wraps the inspect output in `details` (env and command also
+    // appear in `profile`, which is never passed on)
+    const raw = host === 'synology'
+      ? (await synoRequest('SYNO.Docker.Container', 'get', 1, { name })).details
       : await getTitanContainer(name)
 
-    res.json(data)
+    res.json(sanitizeInspect(raw))
   } catch (err) {
     next(err)
   }

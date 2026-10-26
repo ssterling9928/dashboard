@@ -83,6 +83,9 @@ flowchart LR
 **A helper agent instead of mounting the Docker socket.**
 The simplest way to manage Titan's containers would be to mount `/var/run/docker.sock` into the dashboard container. But that gives a web-facing container root-level control of the host. Instead, a small Express agent runs on the host under systemd. It offers only a fixed set of endpoints, checks container names against an allow-list pattern, requires a bearer token on every request (a read-only token can be issued for dev), and listens only on the Docker bridge gateway address. Containers on that network can reach it, but the rest of the LAN can't. The same pattern already existed for the NAS (`host-helper.ts` wrapping `synopkg`), so both hosts work the same way.
 
+**Inspect output is allow-listed, not filtered.**
+Raw `docker inspect` carries every secret a container was given: environment values, command-line flags, labels (for example proxy basic-auth hashes) and healthcheck commands. Rather than trying to remove those, [`inspect.ts`](backend/src/lib/inspect.ts) builds a new object from a fixed list of safe fields, so a field Docker adds later can't leak by default. The Titan helper applies its own allow-list too, because even its read-only token can call inspect.
+
 **One poll, kept in memory, thinned out for charts.**
 The backend polls every source once every 30 seconds and keeps a 24-hour buffer for each metric (2,880 readings). Requests are answered from memory, so the charts never wait on SNMP. Ranges are selected by timestamp, and long ranges are reduced to at most 288 points by keeping the highest reading from each group, so a 30-second spike isn't averaged away. Current, average and peak values are still calculated from every reading.
 
@@ -125,6 +128,7 @@ dashboard/
 │       └── lib/
 │           ├── alerts.ts          # alert rules and thresholds (pure, unit-tested)
 │           ├── metricMath.ts      # range selection, downsampling, summaries (pure, unit-tested)
+│           ├── inspect.ts         # allow-listed docker inspect for the Inspect view (pure, unit-tested)
 │           ├── parsers.ts         # Docker, syslog and timestamp parsers (pure, unit-tested)
 │           ├── synology.ts        # DSM Web API client with session refresh
 │           ├── snmp.ts            # SNMP get/walk and OID definitions
@@ -232,10 +236,10 @@ npx tsx titan-helper.ts                 # or run it as a systemd service
 
 ## Testing
 
-The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
+The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, inspect sanitizing (with planted secrets), the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
-cd backend  && npm test     # 51 tests
+cd backend  && npm test     # 56 tests
 cd frontend && npm test     # 20 tests
 npm test                    # both, from the repo root
 ```

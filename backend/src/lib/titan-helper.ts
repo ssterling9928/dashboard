@@ -99,6 +99,46 @@ async function listContainers() {
     }))
 }
 
+// Copy only the listed keys (one level) from an object, if present
+function pick(source: any, keys: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (!source || typeof source !== 'object') return out
+  for (const key of keys) {
+    if (key in source) out[key] = source[key]
+  }
+  return out
+}
+
+// Allow-list of `docker inspect` fields the dashboard uses. Env values,
+// Cmd/Entrypoint/Args, Labels and healthcheck output never leave the host:
+// any of them can hold secrets, and even the read-only token can call this.
+// Env is reduced to variable names.
+function safeInspect(raw: any) {
+  const env: unknown[] = Array.isArray(raw?.Config?.Env) ? raw.Config.Env : []
+
+  return {
+    ...pick(raw, ['Id', 'Name', 'Created', 'Image', 'RestartCount']),
+    State: {
+      ...pick(raw?.State, ['Status', 'Running', 'Paused', 'Restarting', 'OOMKilled', 'ExitCode', 'StartedAt', 'FinishedAt']),
+      ...(raw?.State?.Health ? { Health: pick(raw.State.Health, ['Status']) } : {}),
+    },
+    Config: {
+      ...pick(raw?.Config, ['Image', 'User', 'WorkingDir', 'ExposedPorts']),
+      Env: env.filter((e): e is string => typeof e === 'string').map(e => e.split('=')[0]),
+    },
+    HostConfig: pick(raw?.HostConfig, ['RestartPolicy', 'NetworkMode', 'Privileged', 'ReadonlyRootfs', 'CapAdd', 'PortBindings']),
+    Mounts: (Array.isArray(raw?.Mounts) ? raw.Mounts : [])
+      .map((m: any) => pick(m, ['Type', 'Source', 'Destination', 'Mode', 'RW'])),
+    NetworkSettings: {
+      ...pick(raw?.NetworkSettings, ['Ports']),
+      Networks: Object.fromEntries(
+        Object.entries(raw?.NetworkSettings?.Networks ?? {})
+          .map(([net, cfg]) => [net, pick(cfg, ['IPAddress', 'Gateway', 'MacAddress', 'Aliases'])])
+      ),
+    },
+  }
+}
+
 async function inspectContainer(name: string) {
   assertContainerName(name)
   const stdout = await runDocker(['inspect', name])
@@ -106,7 +146,7 @@ async function inspectContainer(name: string) {
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error(`Container not found: ${name}`)
   }
-  return parsed[0]
+  return safeInspect(parsed[0])
 }
 
 // ── System metrics ───────────────────────────────────────
