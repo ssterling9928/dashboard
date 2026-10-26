@@ -1,0 +1,12 @@
+# Keep the build context small, and keep secrets and dev-only
+# settings (code-server proxy paths) out of the image.
+**/node_modules
+**/dist
+**/.env
+**/*.env
+**/*.local
+.git
+.claude
+docs
+AI_CHANGES.md
+SESSION.md

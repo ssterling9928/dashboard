@@ -2,12 +2,12 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/server.js",
+  "main": "dist/backend/src/server.js",
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file=backend.env src/server.ts",
     "build": "tsc",
-    "start": "node --env-file=backend.env dist/server.js",
+    "start": "node --env-file=backend.env dist/backend/src/server.js",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"

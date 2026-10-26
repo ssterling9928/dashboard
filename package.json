@@ -1,0 +1,10 @@
+{
+  "name": "homelab-dashboard",
+  "private": true,
+  "description": "Entry points for both ways of running the dashboard. Dependencies live in backend/ and frontend/.",
+  "scripts": {
+    "dev": "sh scripts/dev.sh",
+    "deploy": "docker compose up -d --build",
+    "test": "npm --prefix backend test && npm --prefix frontend test"
+  }
+}

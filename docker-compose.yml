@@ -1,0 +1,19 @@
+services:
+  dashboard:
+    build: .
+    image: homelab-dashboard
+    container_name: homelab-dashboard
+    restart: unless-stopped
+    env_file: backend/backend.env
+    environment:
+      PORT: 4000              # the image listens on 4000; overrides backend.env
+      TZ: America/Chicago     # log timestamps are shown in local time
+    # No published ports: the dashboard has no login and can start/stop
+    # containers, so it's only reachable on "private". Nginx Proxy Manager
+    # (also on "private") forwards to http://homelab-dashboard:4000.
+    networks:
+      - private               # reaches Loki by name and titan-helper at the gateway
+
+networks:
+  private:
+    external: true

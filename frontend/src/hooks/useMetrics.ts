@@ -1,8 +1,7 @@
 
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import type { Host, MetricSummary } from '@shared/types'
-
-const API = import.meta.env.VITE_API_URL || '/proxy/4000'
+import { API } from '../config/api'
 
 interface MetricsResponse {
   cpu:     MetricSummary
