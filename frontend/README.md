@@ -1,73 +1,40 @@
-# React + TypeScript + Vite
+# Homelab Dashboard: frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React single-page app for the [Homelab Dashboard](../README.md). It reads everything from the backend's `/api/*` endpoints; see the root README for the architecture, the API and how to run the whole thing.
 
-Currently, two official plugins are available:
+**Stack:** React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, Recharts, React Router, lucide-react.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Scripts
 
-## React Compiler
+| Command | What it does |
+|---|---|
+| `npm run dev` | Vite dev server on :5173. `/api` is forwarded to the dev backend on :4000. |
+| `npm run build` | Type-checks, then builds to `dist/`. The Docker image serves this from the backend. |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest unit tests (formatting, log collapsing, saved chart ranges, theme) |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+From the repo root, `npm run dev` starts this and the backend together.
 
-## Expanding the ESLint configuration
+## Settings
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Vite reads these from `frontend/.env` (gitignored). They're built into the JavaScript at build time, so they can't be changed when the container starts. None of them are needed for a plain local setup.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Variable | Purpose |
+|---|---|
+| `VITE_BASE_PATH` | Path prefix when served behind a path-based proxy, e.g. `/proxy/5173` for code-server |
+| `VITE_HMR_HOST` | Public hostname for hot reload behind that proxy |
+| `VITE_API_URL` | Backend base URL, e.g. `/proxy/4000`. Unset means the same origin, which is right in the Docker image and with the dev proxy. |
+| `VITE_GRAFANA_URL` | Grafana base URL for the "Open Grafana" and per-container "Logs" links. The Grafana button is hidden when unset. |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Layout
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+├── pages/Dashboard.tsx    # the one page: header, stat rows, tabs, sidebar
+├── components/            # cards, tabs, charts, modals, badges, theme switch
+├── hooks/                 # one TanStack Query hook per endpoint, plus theme and host selection
+├── utils/                 # pure, unit-tested helpers
+└── config/                # API base URL, sidebar quick links
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Data shapes come from `shared/types.ts` (the `@shared` alias), which the backend uses too.

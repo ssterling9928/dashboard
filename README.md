@@ -22,7 +22,7 @@ Each host is reached a different way, and the backend combines them all into one
 
 ## Features
 
-- **Containers from both hosts in one list.** Each card has a host badge and a status badge. A detail view shows the image, ports, networks, restart policy and uptime, and you can **start, stop and restart** containers from it.
+- **Containers from both hosts in one list.** Each card has a host badge and a status badge. A detail view shows the image, ports, networks, restart policy and uptime, and you can **start, stop and restart** containers from it. Its Inspect view shows a safe subset of `docker inspect`: environment variable names but never their values, and no command line, labels or healthcheck output.
 - **Stat cards for each host.** CPU, memory, storage and network, each with its 24-hour average and peak.
 - **Monitoring charts** with a Vault / Titan switch and 1h / 6h / 24h ranges. Longer ranges are thinned out so the charts stay readable, keeping the highest reading from each slice so short spikes still show. A dashed line marks the peak.
 - **Live system status** for each host: online or offline, model, uptime, load average and containers running.
@@ -60,7 +60,7 @@ flowchart LR
         NasHelper["host-helper<br/>(synopkg)"]
     end
 
-    Backend -->|"HTTP · Docker bridge gateway"| Helper
+    Backend -->|"HTTP · bearer token · Docker bridge gateway"| Helper
     Backend -->|LogQL| Loki
     Backend -->|"SNMP v2c · every 30s"| SNMP
     Backend -->|"HTTPS · session auth"| DSM
@@ -81,7 +81,7 @@ flowchart LR
 ## Design decisions
 
 **A helper agent instead of mounting the Docker socket.**
-The simplest way to manage Titan's containers would be to mount `/var/run/docker.sock` into the dashboard container. But that gives a web-facing container root-level control of the host. Instead, a small Express agent runs on the host under systemd. It offers only a fixed set of endpoints, checks container names against an allow-list pattern, requires a bearer token on every request (a read-only token can be issued for dev), and listens only on the Docker bridge gateway address. Containers on that network can reach it, but the rest of the LAN can't. The same pattern already existed for the NAS (`host-helper.ts` wrapping `synopkg`), so both hosts work the same way.
+The simplest way to manage Titan's containers would be to mount `/var/run/docker.sock` into the dashboard container. But that gives a web-facing container root-level control of the host. Instead, a small Express agent runs on the host under systemd. It offers only a fixed set of endpoints, checks container names against an allow-list pattern, requires a bearer token on every request (a read-only token can be issued for dev), and listens only on the Docker bridge gateway address. That keeps it off the LAN. Docker doesn't generally block containers from reaching a host address, even from other networks, so the token, not the network, decides who may use it. The same pattern already existed for the NAS (`host-helper.ts` wrapping `synopkg`), so both hosts work the same way.
 
 **Inspect output is allow-listed, not filtered.**
 Raw `docker inspect` carries every secret a container was given: environment values, command-line flags, labels (for example proxy basic-auth hashes) and healthcheck commands. Rather than trying to remove those, [`inspect.ts`](backend/src/lib/inspect.ts) builds a new object from a fixed list of safe fields, so a field Docker adds later can't leak by default. The Titan helper applies its own allow-list too, because even its read-only token can call inspect.
@@ -159,11 +159,13 @@ dashboard/
 |---|---|
 | `GET /api/services` | Containers on both hosts. IDs are `<host>:<name>`. |
 | `GET /api/services/:id` | Container detail |
+| `GET /api/services/:id/inspect` | Allow-listed `docker inspect` (env names only, no values) |
 | `POST /api/services/:id/{start,stop,restart}` | Container actions |
 | `GET /api/metrics?type=cpu\|memory\|disk\|network&host=synology\|titan&range=1-24` | Current, average, peak and history |
 | `GET /api/status` | Per-host status, alerts, and an overall `ok` / `warning` / `critical` |
 | `GET /api/logs?host=synology\|titan&limit=50` | Recent log lines |
 | `GET /api/packages`, `GET /api/packages/:id` | Synology packages |
+| `GET /api/health` | Liveness check (used by the container healthcheck) |
 
 ---
 
@@ -249,10 +251,13 @@ npm test                    # both, from the repo root
 ## Roadmap
 
 - [ ] Demo mode with sample data, and a hosted live demo
-- [x] Unit tests for alert rules, metric averaging and parsers
+- [x] Unit tests for alert rules, metric downsampling, inspect sanitizing and parsers
 - [ ] API and component tests, plus GitHub Actions CI
-- [ ] Dockerfile and Compose for the dashboard, and the systemd unit for the helper
-- [ ] Token authentication for the helper agents
+- [x] Dockerfile and Compose for the dashboard
+- [ ] systemd unit for the Titan helper in the repo
+- [x] Token authentication for the Titan helper, with a read-only token for dev
+- [ ] Token authentication for the NAS helper
+- [ ] A login in front of the dashboard
 - [ ] Metric history that survives restarts (Prometheus), for 7-day charts
 - [x] Dark mode
 
