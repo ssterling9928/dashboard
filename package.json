@@ -1,10 +1,9 @@
 {
   "name": "homelab-dashboard",
   "private": true,
-  "description": "Entry points for both ways of running the dashboard. Dependencies live in backend/ and frontend/.",
+  "description": "Entry points for dev mode and tests. Dependencies live in backend/ and frontend/. Deploys run from /opt on titan (see docker-compose.yml).",
   "scripts": {
     "dev": "sh scripts/dev.sh",
-    "deploy": "docker compose up -d --build",
     "test": "npm --prefix backend test && npm --prefix frontend test"
   }
 }

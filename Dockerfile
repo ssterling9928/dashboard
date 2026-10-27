@@ -1,7 +1,7 @@
 # Homelab dashboard: one image, one port.
 # The Express backend serves the API and the built React frontend.
 #
-#   docker compose up -d --build
+#   docker compose up -d --build   (from /opt on titan; see docker-compose.yml)
 
 # ── Frontend build ────────────────────────────────────────
 FROM node:22-alpine AS frontend
@@ -10,6 +10,9 @@ COPY shared/ shared/
 COPY frontend/package.json frontend/package-lock.json frontend/.npmrc frontend/
 RUN cd frontend && npm ci
 COPY frontend/ frontend/
+# Built into the JavaScript, so it's a build argument, not a runtime setting.
+# Optional: without it the Grafana buttons are hidden.
+ARG VITE_GRAFANA_URL
 RUN cd frontend && npm run build
 
 # ── Backend build ─────────────────────────────────────────

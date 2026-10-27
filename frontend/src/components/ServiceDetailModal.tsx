@@ -123,9 +123,11 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
     queryClient.invalidateQueries({ queryKey: ['services'] })
   }
 
-  const grafanaUrl = service
-    ? `${import.meta.env.VITE_GRAFANA_URL}/explore?left={"queries":[{"expr":"{container_name=\\"${service.Name}\\"}"}]}`
-    : '#'
+  // Set at build time; without it there's nowhere to send the Logs button
+  const grafanaBase = import.meta.env.VITE_GRAFANA_URL
+  const grafanaUrl = service && grafanaBase
+    ? `${grafanaBase}/explore?left={"queries":[{"expr":"{container_name=\\"${service.Name}\\"}"}]}`
+    : null
 
   return (
     <div
@@ -206,12 +208,14 @@ export default function ServiceDetailsModal({ serviceId, onClose }: Props) {
                       variant="green"
                     />
                   )}
-                  <ToolButton
-                    label="Check Logs"
-                    buttonText="Logs"
-                    href={grafanaUrl}
-                    variant="green"
-                  />
+                  {grafanaUrl && (
+                    <ToolButton
+                      label="Check Logs"
+                      buttonText="Logs"
+                      href={grafanaUrl}
+                      variant="green"
+                    />
+                  )}
                   <ToolButton
                     label="Restart Container"
                     buttonText="Restart"
