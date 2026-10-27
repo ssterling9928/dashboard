@@ -146,9 +146,9 @@ dashboard/
 ├── shared/
 │   └── types.ts                   # API data shapes shared by both sides
 ├── scripts/dev.sh                 # dev mode: backend and Vite together
-├── package.json                   # npm run dev / deploy / test
+├── package.json                   # npm run dev / test
 ├── Dockerfile                     # builds both, runs the backend serving the frontend
-└── docker-compose.yml             # the container on the "private" network
+└── docker-compose.yml             # production compose: builds a tagged release from GitHub
 ```
 
 ---
@@ -173,7 +173,7 @@ dashboard/
 
 The dashboard needs real hosts to talk to: a Synology NAS with SNMP turned on, and a Linux host running the helper agent. A demo mode with sample data is on the roadmap.
 
-**Backend:** create `backend/backend.env`:
+**Backend:** create `backend/backend.env` for dev. In production the same file sits beside `docker-compose.yml` on the server, with the helper's full token instead of the read-only one:
 
 ```env
 PORT=4000
@@ -192,18 +192,26 @@ There are two ways to run it, and they don't interfere with each other. Each has
 
 | | Container | Dev |
 |---|---|---|
-| Command (repo root) | `npm run deploy` | `npm run dev` |
+| Command | `docker compose up -d --build` (on Titan, from `/opt`) | `npm run dev` (repo root) |
 | What runs | one container: the backend also serves the built frontend | `tsx watch` backend on :4000 and the Vite dev server on :5173 |
-| Picks up changes | on the next deploy | on save |
+| Picks up changes | when you tag a release and rebuild | on save |
 | Used for | the dashboard you actually use | trying changes before deploying them |
 
-**Container** (on Titan, where Docker runs):
+**Container** (on Titan, where Docker runs). The deploy never reads the workspace: [`docker-compose.yml`](docker-compose.yml) builds a tagged release straight from GitHub, so an edit that isn't committed, pushed and tagged can't reach production.
 
 ```bash
-npm run deploy          # docker compose up -d --build
+# in the repo: release a version
+git tag v1.0.0 && git push origin main v1.0.0
+
+# on Titan
+cd /opt/docker/compose/homelab-dashboard   # docker-compose.yml (copied from the repo) + backend.env
+chmod 600 backend.env
+docker compose up -d --build
 ```
 
-`docker-compose.yml` reads `backend/backend.env`, sets the time zone, and joins the existing `private` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports: the dashboard has no login and can start and stop containers, so it's reached only through the reverse proxy. In Nginx Proxy Manager (also on `private`), forward to `http://homelab-dashboard:4000`.
+To deploy a new version, bump the tag in the compose file's `context` and `image`, commit, push the commit and tag, copy the file over and rebuild. Old images stay tagged, so rolling back is changing the tag back.
+
+The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, and joins the existing `private` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports: the dashboard has no login and can start and stop containers, so it's reached only through the reverse proxy. In Nginx Proxy Manager (also on `private`), forward to `http://homelab-dashboard:4000`.
 
 **Dev:**
 

@@ -1,3 +1,6 @@
 SESSION.md
 
 AI_CHANGES.md
+
+# Production secrets sit beside docker-compose.yml on the server, never here
+backend.env
