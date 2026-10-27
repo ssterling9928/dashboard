@@ -1,17 +1,37 @@
 import 'dotenv/config'
 import { fetch, Agent } from 'undici'
 import type { SynoParams } from "./../types/types.js"
+import { normalizeFingerprint, pinnedConnector } from './certPin.js'
 
 const BASE = process.env.SYNO_HOST!
 const USER = process.env.SYNO_USER!
 const PASS = process.env.SYNO_PASS!
 
-// undici Agent — properly disables TLS verification for self-signed NAS cert
-const agent = new Agent({
-  connect: {
-    rejectUnauthorized: false,
-  },
-})
+// The NAS is trusted by its certificate's SHA-256 fingerprint (see certPin.ts).
+// Fails closed: without a valid SYNO_CERT_SHA256, no request (and so no
+// password) is ever sent.
+const CERT_SHA256 = normalizeFingerprint(process.env.SYNO_CERT_SHA256 ?? '')
+const agent = CERT_SHA256
+  ? new Agent({ connect: pinnedConnector(CERT_SHA256) })
+  : null
+
+// Every call is a POST with its parameters in the body. In a URL, the
+// password and session ID would end up in access logs.
+async function postEntry(
+  params: Record<string, string>,
+  headers: Record<string, string> = {}
+): Promise<any> {
+  if (!agent) {
+    throw new Error('SYNO_CERT_SHA256 is missing or invalid; refusing to contact the NAS')
+  }
+  const res = await fetch(`${BASE}/webapi/entry.cgi`, {
+    method: 'POST',
+    dispatcher: agent,
+    headers,
+    body: new URLSearchParams(params),
+  })
+  return res.json()
+}
 
 interface SynoSession {
   sid: string
@@ -21,18 +41,16 @@ interface SynoSession {
 let session: SynoSession | null = null
 
 async function login(): Promise<SynoSession> {
-  const url = new URL(`${BASE}/webapi/entry.cgi`)
-  url.searchParams.set('api', 'SYNO.API.Auth')
-  url.searchParams.set('version', '7')
-  url.searchParams.set('method', 'login')
-  url.searchParams.set('account', USER)
-  url.searchParams.set('passwd', PASS)
-  url.searchParams.set('session', 'dashboard')
-  url.searchParams.set('format', 'sid')
-  url.searchParams.set('enable_syno_token', 'yes')
-
-  const res = await fetch(url.toString(), { dispatcher: agent })
-  const data = await res.json() as any
+  const data = await postEntry({
+    api: 'SYNO.API.Auth',
+    version: '7',
+    method: 'login',
+    account: USER,
+    passwd: PASS,
+    session: 'dashboard',
+    format: 'sid',
+    enable_syno_token: 'yes',
+  })
 
   if (!data.success) {
     throw new Error(`Synology login failed: error code ${data.error?.code}`)
@@ -61,25 +79,17 @@ export async function synoRequest(
 ): Promise<any> {
   const sess = await getSession()
 
-  const url = new URL(`${BASE}/webapi/entry.cgi`)
-  url.searchParams.set('api', api)
-  url.searchParams.set('version', String(version))
-  url.searchParams.set('method', method)
-  url.searchParams.set('_sid', sess.sid)
-
+  const params: Record<string, string> = {
+    api,
+    version: String(version),
+    method,
+    _sid: sess.sid,
+  }
   for (const [key, value] of Object.entries(extra)) {
-    url.searchParams.set(
-      key,
-      Array.isArray(value) ? value.join(',') : String(value)
-    )
+    params[key] = Array.isArray(value) ? value.join(',') : String(value)
   }
 
-  const res = await fetch(url.toString(), {
-    dispatcher: agent,
-    headers: { 'X-SYNO-TOKEN': sess.token },
-  })
-
-  const data = await res.json() as any
+  const data = await postEntry(params, { 'X-SYNO-TOKEN': sess.token })
 
   // Session expired — re-login once and retry
   if (!data.success && data.error?.code === 119) {
