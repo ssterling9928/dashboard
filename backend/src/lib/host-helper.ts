@@ -2,17 +2,71 @@ import 'dotenv/config'
 import express from 'express'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync } from 'node:fs'
+import { createServer } from 'node:https'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import path from 'node:path'
 import type { Package, PackageDetail } from './../types/types.js'
 
 const app = express()
 
+// Fails closed: the helper won't start without an explicit LAN address,
+// a TLS certificate and key, and a token. Requests cross the LAN, so it
+// only speaks HTTPS (the dashboard pins this certificate's fingerprint).
 const PORT = Number(process.env.SYNO_HELPER_PORT)
-const HOST = process.env.SYNO_HELPER_HOST ?? "0.0.0.0"
+const HOST = process.env.SYNO_HELPER_HOST ?? ''
+const TLS_CERT = process.env.SYNO_HELPER_TLS_CERT ?? ''
+const TLS_KEY = process.env.SYNO_HELPER_TLS_KEY ?? ''
 const SYNOPKG = process.env.SYNOPKG_PATH ?? '/usr/syno/bin/synopkg'
 
+// Every route but /health needs a bearer token. SYNO_HELPER_TOKEN allows
+// everything (the production dashboard); SYNO_HELPER_READ_TOKEN, if set,
+// allows only GETs (dev).
+const TOKEN = process.env.SYNO_HELPER_TOKEN ?? ''
+const READ_TOKEN = process.env.SYNO_HELPER_READ_TOKEN ?? ''
+const MIN_TOKEN_LENGTH = 32
+
+function fail(message: string): never {
+  console.error(message)
+  process.exit(1)
+}
+
+if (!Number.isInteger(PORT) || PORT <= 0) fail('SYNO_HELPER_PORT must be set')
+if (!HOST || HOST === '0.0.0.0' || HOST === '::') {
+  fail('SYNO_HELPER_HOST must be the NAS\'s LAN address (e.g. 10.0.0.30), not every interface')
+}
+if (!TLS_CERT || !TLS_KEY) fail('SYNO_HELPER_TLS_CERT and SYNO_HELPER_TLS_KEY must point to the certificate and key files')
+if (TOKEN.length < MIN_TOKEN_LENGTH) {
+  fail(`SYNO_HELPER_TOKEN must be set to at least ${MIN_TOKEN_LENGTH} characters (openssl rand -hex 32)`)
+}
+if (READ_TOKEN && READ_TOKEN.length < MIN_TOKEN_LENGTH) {
+  fail(`SYNO_HELPER_READ_TOKEN must be at least ${MIN_TOKEN_LENGTH} characters if set`)
+}
+if (READ_TOKEN && READ_TOKEN === TOKEN) fail('SYNO_HELPER_READ_TOKEN must differ from SYNO_HELPER_TOKEN')
+
 const execFileAsync = promisify(execFile)
+
+// Compare digests so the comparison takes the same time whatever the input
+function tokenMatches(given: string, expected: string): boolean {
+  if (!expected) return false
+  const a = createHash('sha256').update(given).digest()
+  const b = createHash('sha256').update(expected).digest()
+  return timingSafeEqual(a, b)
+}
+
+app.use((req, res, next) => {
+  if (req.path === '/health') return next()
+
+  const header = req.get('authorization') ?? ''
+  const given = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : ''
+
+  if (tokenMatches(given, TOKEN)) return next()
+  if (tokenMatches(given, READ_TOKEN)) {
+    if (req.method === 'GET') return next()
+    return res.status(403).json({ error: 'Read-only token' })
+  }
+  res.status(401).json({ error: 'Unauthorized' })
+})
 
 function assertPkgId(id: string): void {
   if (!/^[A-Za-z0-9._-]+$/.test(id)) {
@@ -275,6 +329,11 @@ app.get('/packages/:id', async (req, res) => {
   }
 })
 
-app.listen(PORT, HOST, () => {
-  console.log(`Synology host helper listening on ${HOST}:${PORT}`)
+const server = createServer(
+  { cert: readFileSync(TLS_CERT), key: readFileSync(TLS_KEY), minVersion: 'TLSv1.3' },
+  app,
+)
+
+server.listen(PORT, HOST, () => {
+  console.log(`Synology host helper listening on https://${HOST}:${PORT}`)
 })
