@@ -16,7 +16,10 @@ export function normalizeFingerprint(value: string): string | null {
 // replaced by this pin rather than switched off. The check runs after the
 // TLS handshake and before the socket is handed back, so nothing (least of
 // all the DSM password) is sent to a server with any other certificate.
-export function pinnedConnector(fingerprint: string): buildConnector.connector {
+export function pinnedConnector(
+  fingerprint: string,
+  envName = 'SYNO_CERT_SHA256',
+): buildConnector.connector {
   const connect = buildConnector({ rejectUnauthorized: false })
 
   return (opts, callback) => {
@@ -32,7 +35,7 @@ export function pinnedConnector(fingerprint: string): buildConnector.connector {
         return callback(new Error(
           actual
             ? `Certificate fingerprint mismatch for ${opts.hostname}: got ${actual}. ` +
-              'If the NAS certificate was replaced, check the new fingerprint on the NAS itself before updating SYNO_CERT_SHA256.'
+              `If the certificate was replaced, check the new fingerprint on the NAS itself before updating ${envName}.`
             : `${opts.hostname} is not using HTTPS; the pinned connection needs an https:// URL`
         ), null)
       }

@@ -1,17 +1,14 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import type { Package, PackageDetail } from './../types/types.js'
-import { getJson } from '../lib/http.js'
+import { getNasPackage, getNasPackages } from '../lib/nasHelper.js'
 
 const router = Router()
-
-export const SYNO_HELPER_URL =
-  process.env.SYNO_HELPER_URL?.replace(/\/+$/, '') ?? 'http://YOUR_NAS_IP:4111'
 
 router.get(
   '/',
   async (_req: Request, res: Response<Package[]>, next: NextFunction) => {
     try {
-      const data = await getJson<Package[]>(`${SYNO_HELPER_URL}/packages`)
+      const data = await getNasPackages()
       res.json(data)
     } catch (err) {
       next(err)
@@ -27,9 +24,7 @@ router.get(
     next: NextFunction
   ) => {
     try {
-      const data = await getJson<PackageDetail>(
-        `${SYNO_HELPER_URL}/packages/${encodeURIComponent(req.params.id)}`
-      )
+      const data = await getNasPackage(req.params.id)
       res.json(data)
     } catch (err) {
       next(err)

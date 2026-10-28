@@ -1,7 +1,6 @@
 import { Router } from 'express'
-import { getJson } from '../lib/http.js'
 import { listSynologyServices, listTitanServices } from './services.js'
-import { SYNO_HELPER_URL } from './packages.js'
+import { getNasHelperHealth } from '../lib/nasHelper.js'
 import {
   getHostSnapshot,
   getVaultHealth,
@@ -54,7 +53,7 @@ router.get('/', async (_req, res, next) => {
     const [synologyServices, titanServices, synologyHelper] = await Promise.allSettled([
       listSynologyServices(),
       listTitanServices(),
-      getJson(`${SYNO_HELPER_URL}/health`, 5000),
+      getNasHelperHealth(),
     ])
 
     const services = [synologyServices, titanServices]

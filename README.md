@@ -64,7 +64,7 @@ flowchart LR
     Backend -->|LogQL| Loki
     Backend -->|"SNMP v2c · every 30s"| SNMP
     Backend -->|"HTTPS · session auth"| DSM
-    Backend -->|HTTP| NasHelper
+    Backend -->|"HTTPS · pinned cert · bearer token"| NasHelper
 ```
 
 | Data | Vault | Titan |
@@ -87,7 +87,7 @@ The simplest way to manage Titan's containers would be to mount `/var/run/docker
 Raw `docker inspect` carries every secret a container was given: environment values, command-line flags, labels (for example proxy basic-auth hashes) and healthcheck commands. Rather than trying to remove those, [`inspect.ts`](backend/src/lib/inspect.ts) builds a new object from a fixed list of safe fields, so a field Docker adds later can't leak by default. The Titan helper applies its own allow-list too, because even its read-only token can call inspect.
 
 **The NAS is trusted by certificate fingerprint, and credentials never go in a URL.**
-DSM serves a certificate that normal TLS checks can't accept: its issuer (Cloudflare's Origin CA) isn't publicly trusted, and the backend connects by IP. Rather than switching verification off, which would hand the DSM password to anything on the LAN that answers as the NAS, [`certPin.ts`](backend/src/lib/certPin.ts) accepts exactly one certificate, by its SHA-256 fingerprint (`SYNO_CERT_SHA256`), and checks it before any request is sent. Without a valid fingerprint the backend refuses to contact DSM at all. Every DSM call is a POST with the password or session ID in the body, so they never land in access logs. The DSM account is a dedicated, locked-down admin (Container Manager has no non-admin access), not a personal one.
+DSM serves a certificate that normal TLS checks can't accept: its issuer (Cloudflare's Origin CA) isn't publicly trusted, and the backend connects by IP. Rather than switching verification off, which would hand the DSM password to anything on the LAN that answers as the NAS, [`certPin.ts`](backend/src/lib/certPin.ts) accepts exactly one certificate, by its SHA-256 fingerprint (`SYNO_CERT_SHA256`), and checks it before any request is sent. Without a valid fingerprint the backend refuses to contact DSM at all. The NAS helper is reached the same way: its token crosses the LAN (unlike the Titan helper's, which never leaves the host), so it serves only HTTPS (TLS 1.3) with its own self-signed certificate, pinned by `SYNO_HELPER_CERT_SHA256`. Every DSM call is a POST with the password or session ID in the body, so they never land in access logs. The DSM account is a dedicated, locked-down admin (Container Manager has no non-admin access), not a personal one.
 
 **One poll, kept in memory, thinned out for charts.**
 The backend polls every source once every 30 seconds and keeps a 24-hour buffer for each metric (2,880 readings). Requests are answered from memory, so the charts never wait on SNMP. Ranges are selected by timestamp, and long ranges are reduced to at most 288 points by keeping the highest reading from each group, so a 30-second spike isn't averaged away. Current, average and peak values are still calculated from every reading.
@@ -134,6 +134,8 @@ dashboard/
 │           ├── inspect.ts         # allow-listed docker inspect for the Inspect view (pure, unit-tested)
 │           ├── parsers.ts         # Docker, syslog and timestamp parsers (pure, unit-tested)
 │           ├── synology.ts        # DSM Web API client with session refresh
+│           ├── certPin.ts         # trust one certificate by SHA-256 fingerprint (DSM and the NAS helper)
+│           ├── nasHelper.ts       # client for the NAS helper (pinned HTTPS, bearer token)
 │           ├── snmp.ts            # SNMP get/walk and OID definitions
 │           ├── titan.ts           # client for the Titan helper
 │           ├── loki.ts            # Loki query_range client
@@ -186,7 +188,9 @@ SYNO_PASS=<dsm-password>
 SYNO_CERT_SHA256=<sha256 fingerprint of the DSM certificate>   # openssl s_client -connect <nas-ip>:<dsm-port> </dev/null | openssl x509 -noout -fingerprint -sha256
 SNMP_HOST=<nas-ip>
 SNMP_COMMUNITY=<community>
-SYNO_HELPER_URL=http://<nas-ip>:4111
+SYNO_HELPER_URL=https://<nas-ip>:4111
+SYNO_HELPER_CERT_SHA256=<sha256 fingerprint of the helper's certificate>
+SYNO_HELPER_TOKEN=<token>       # the NAS helper's full token in production, its read-only token in dev
 TITAN_HELPER_URL=http://<docker-gateway-ip>:4222
 TITAN_HELPER_TOKEN=<token>      # the helper's full token in production, its read-only token in dev
 LOKI_URL=http://loki:3100
@@ -246,6 +250,24 @@ npm install express dotenv tsx
 npx tsx titan-helper.ts                 # or run it as a systemd service
 ```
 
+**NAS helper:** runs on the NAS as root (`synopkg` needs it), started by a boot-time Task Scheduler task. Keep its folder and `.env` outside every shared folder and readable only by root: anyone who could edit a script that root runs would have root on the NAS. It refuses to start without an explicit LAN address, a certificate and key, and a token.
+
+```bash
+# Self-signed certificate (the dashboard pins its fingerprint, so no CA is involved)
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 \
+  -subj "/CN=vault-helper" -keyout helper-key.pem -out helper-cert.pem
+chmod 600 helper-key.pem
+openssl x509 -in helper-cert.pem -noout -fingerprint -sha256   # → SYNO_HELPER_CERT_SHA256
+
+# .env next to host-helper.ts
+SYNO_HELPER_PORT=4111
+SYNO_HELPER_HOST=<nas-ip>               # the LAN address only; 0.0.0.0 is refused
+SYNO_HELPER_TLS_CERT=<path>/helper-cert.pem
+SYNO_HELPER_TLS_KEY=<path>/helper-key.pem
+SYNO_HELPER_TOKEN=<openssl rand -hex 32>        # required; full access, for the production dashboard
+SYNO_HELPER_READ_TOKEN=<openssl rand -hex 32>   # optional; GET only, for dev
+```
+
 ---
 
 ## Testing
@@ -253,7 +275,7 @@ npx tsx titan-helper.ts                 # or run it as a systemd service
 The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, inspect sanitizing (with planted secrets), the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
-cd backend  && npm test     # 61 tests
+cd backend  && npm test     # 64 tests
 cd frontend && npm test     # 20 tests
 npm test                    # both, from the repo root
 ```
@@ -268,7 +290,7 @@ npm test                    # both, from the repo root
 - [x] Dockerfile and Compose for the dashboard
 - [ ] systemd unit for the Titan helper in the repo
 - [x] Token authentication for the Titan helper, with a read-only token for dev
-- [ ] Token authentication for the NAS helper
+- [x] Token authentication and pinned HTTPS for the NAS helper
 - [ ] A login in front of the dashboard
 - [ ] Metric history that survives restarts (Prometheus), for 7-day charts
 - [x] Dark mode
