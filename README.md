@@ -275,7 +275,7 @@ SYNO_HELPER_READ_TOKEN=<openssl rand -hex 32>   # optional; GET only, for dev
 The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, inspect sanitizing (with planted secrets), the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
-cd backend  && npm test     # 68 tests
+cd backend  && npm test     # 82 tests
 cd frontend && npm test     # 20 tests
 npm test                    # both, from the repo root
 ```

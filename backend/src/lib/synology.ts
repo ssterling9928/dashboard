@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { fetch, Agent } from 'undici'
 import type { SynoParams } from "./../types/types.js"
 import { normalizeFingerprint, pinnedConnector } from './certPin.js'
+import { UpstreamError, fetchFailureReason } from './http.js'
 
 const BASE = process.env.SYNO_HOST!
 const USER = process.env.SYNO_USER!
@@ -15,6 +16,35 @@ const agent = CERT_SHA256
   ? new Agent({ connect: pinnedConnector(CERT_SHA256) })
   : null
 
+const TIMEOUT_MS = 15000
+
+// DSM error codes that mean "this session is no longer valid": timed out,
+// interrupted by another login, or unknown SID. Logging in again fixes them.
+const SESSION_ERRORS = new Set([106, 107, 119])
+
+export function isSessionError(code: unknown): boolean {
+  return typeof code === 'number' && SESSION_ERRORS.has(code)
+}
+
+// The DSM codes worth explaining when they show up in an alert or log line
+const DSM_ERRORS: Record<number, string> = {
+  105: 'permission denied',
+  106: 'session timed out',
+  107: 'session interrupted by another login',
+  119: 'session not found',
+  400: 'wrong account or password',
+  401: 'account disabled',
+  402: 'permission denied',
+  403: '2-factor code required',
+  407: 'IP blocked by DSM auto-block',
+}
+
+export function describeDsmError(code: unknown): string {
+  if (typeof code !== 'number') return 'unknown error'
+  const meaning = DSM_ERRORS[code]
+  return meaning ? `code ${code} (${meaning})` : `code ${code}`
+}
+
 // Every call is a POST with its parameters in the body. In a URL, the
 // password and session ID would end up in access logs.
 async function postEntry(
@@ -24,13 +54,23 @@ async function postEntry(
   if (!agent) {
     throw new Error('SYNO_CERT_SHA256 is missing or invalid; refusing to contact the NAS')
   }
+
   const res = await fetch(`${BASE}/webapi/entry.cgi`, {
     method: 'POST',
     dispatcher: agent,
     headers,
     body: new URLSearchParams(params),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  }).catch((err: unknown) => {
+    throw new UpstreamError(`DSM unreachable: ${fetchFailureReason(err, TIMEOUT_MS)}`, { cause: err })
   })
-  return res.json()
+
+  if (!res.ok) {
+    throw new UpstreamError(`DSM returned ${res.status}`)
+  }
+  return res.json().catch(() => {
+    throw new UpstreamError('DSM returned a response that is not JSON')
+  })
 }
 
 interface SynoSession {
@@ -39,6 +79,11 @@ interface SynoSession {
 }
 
 let session: SynoSession | null = null
+
+// While a login is in flight, every caller waits for that one. Separate
+// logins with the same session name interrupt each other (code 107), so
+// parallel requests each logging in would knock each other out.
+let loggingIn: Promise<SynoSession> | null = null
 
 async function login(): Promise<SynoSession> {
   const data = await postEntry({
@@ -53,7 +98,7 @@ async function login(): Promise<SynoSession> {
   })
 
   if (!data.success) {
-    throw new Error(`Synology login failed: error code ${data.error?.code}`)
+    throw new UpstreamError(`Synology login failed: ${describeDsmError(data.error?.code)}`)
   }
 
   session = {
@@ -67,7 +112,8 @@ async function login(): Promise<SynoSession> {
 
 export async function getSession(): Promise<SynoSession> {
   if (session) return session
-  return login()
+  loggingIn ??= login().finally(() => { loggingIn = null })
+  return loggingIn
 }
 
 export async function synoRequest(
@@ -91,15 +137,19 @@ export async function synoRequest(
 
   const data = await postEntry(params, { 'X-SYNO-TOKEN': sess.token })
 
-  // Session expired — re-login once and retry
-  if (!data.success && data.error?.code === 119) {
-    if (retried) throw new Error('Synology session could not be refreshed')
-    session = null
+  // Session no longer valid: log in again once and retry. Only drop the
+  // session if it's still the one that failed; a parallel request may
+  // already have replaced it.
+  if (!data.success && isSessionError(data.error?.code)) {
+    if (retried) {
+      throw new UpstreamError(`Synology session could not be refreshed: ${describeDsmError(data.error?.code)}`)
+    }
+    if (session === sess) session = null
     return synoRequest(api, method, version, extra, true)
   }
 
   if (!data.success) {
-    throw new Error(`Synology API error [${api}/${method}]: code ${data.error?.code}`)
+    throw new UpstreamError(`Synology API error [${api}/${method}]: ${describeDsmError(data.error?.code)}`)
   }
 
   return data.data
