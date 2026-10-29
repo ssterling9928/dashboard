@@ -7,6 +7,7 @@ import metricsRouter from "./routes/metrics.js"
 import logsRouter from "./routes/logs.js"
 import packagesRouter from "./routes/packages.js"
 import statusRouter from "./routes/status.js"
+import { UpstreamError } from "./lib/http.js"
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -47,7 +48,13 @@ if (STATIC_DIR) {
   })
 }
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err instanceof UpstreamError) {
+    // Expected when a host is down; the message already says which and why
+    console.error(`${req.method} ${req.originalUrl}: ${err.message}`)
+    res.status(err.status).json({ error: err.message })
+    return
+  }
   console.error(err.stack)
   res.status(500).json({ error: err.message })
 })

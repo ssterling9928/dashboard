@@ -1,6 +1,7 @@
 import { fetch, Agent } from 'undici'
 import type { Package, PackageDetail } from '../types/types.js'
 import { normalizeFingerprint, pinnedConnector } from './certPin.js'
+import { UpstreamError, fetchFailureReason } from './http.js'
 
 // Client for the NAS helper (host-helper.ts on Vault). Requests cross the
 // LAN, so it's HTTPS only, and the helper's self-signed certificate is
@@ -26,11 +27,13 @@ async function helperGet<T>(path: string, timeoutMs = 10000): Promise<T> {
     dispatcher: agent,
     headers: { Accept: 'application/json', ...AUTH },
     signal: AbortSignal.timeout(timeoutMs),
+  }).catch((err: unknown) => {
+    throw new UpstreamError(`NAS helper unreachable: ${fetchFailureReason(err, timeoutMs)}`, { cause: err })
   })
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new Error(`Request failed (${response.status}): ${body || response.statusText}`)
+    throw new UpstreamError(`NAS helper returned ${response.status}: ${body || response.statusText}`)
   }
 
   return (await response.json()) as T
