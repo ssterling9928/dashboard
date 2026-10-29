@@ -73,6 +73,27 @@ describe.skipIf(!hasOpenssl)('pinnedConnector', () => {
     expect(received).toContain('hello')
   })
 
+  // Regression: undici resumes cached TLS sessions on new connections, and
+  // a resumed session reports an empty peer certificate, so every reconnect
+  // after the first used to fail the pin until the backend was restarted.
+  it('keeps accepting the pinned certificate across reconnects', async () => {
+    const agent = new Agent({
+      connect: pinnedConnector(serverFp),
+      keepAliveTimeout: 50,
+      keepAliveMaxTimeout: 50,
+    })
+    try {
+      for (let i = 0; i < 4; i++) {
+        const res = await fetch(url, { method: 'POST', body: `reconnect-${i}`, dispatcher: agent })
+        expect(await res.text()).toBe('ok')
+        await new Promise(resolve => setTimeout(resolve, 150))   // let the connection close
+      }
+    } finally {
+      await agent.close()
+    }
+    expect(received).toEqual(expect.arrayContaining(['reconnect-0', 'reconnect-1', 'reconnect-2', 'reconnect-3']))
+  })
+
   it('refuses a different certificate before sending anything', async () => {
     const agent = new Agent({ connect: pinnedConnector(FP) })
     const err = await fetch(url, { method: 'POST', body: 'passwd=secret', dispatcher: agent })
