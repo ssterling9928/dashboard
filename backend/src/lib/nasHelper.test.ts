@@ -76,7 +76,7 @@ describe.skipIf(!hasOpenssl)('NAS helper client', () => {
     const wrong = fingerprint.replace(/^../, fingerprint.startsWith('00') ? '11' : '00')
     const client = await loadClient({ SYNO_HELPER_CERT_SHA256: wrong })
     const err = await client.getNasPackages().then(() => null, (e: Error) => e)
-    expect((err?.cause as Error | undefined)?.message).toMatch(/SYNO_HELPER_CERT_SHA256/)
+    expect(err?.message).toMatch(/NAS helper unreachable: .*SYNO_HELPER_CERT_SHA256/)
     expect(authHeaders).toEqual([])
   })
 })

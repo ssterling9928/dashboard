@@ -56,3 +56,17 @@ export function describeError(err: unknown): string {
   const cause = err.cause as { code?: string; message?: string } | undefined
   return cause?.code ?? cause?.message ?? err.message
 }
+
+// A dependency (helper, NAS, Loki) failed, not the dashboard itself.
+// The error handler answers 502 and logs one line instead of a stack trace.
+export class UpstreamError extends Error {
+  readonly status = 502
+}
+
+// Turns a rejected fetch into a short reason: "ECONNREFUSED", "timed out after 10s", …
+export function fetchFailureReason(err: unknown, timeoutMs: number): string {
+  if (err instanceof Error && err.name === 'TimeoutError') {
+    return `timed out after ${timeoutMs / 1000}s`
+  }
+  return describeError(err)
+}
