@@ -20,7 +20,11 @@ export function pinnedConnector(
   fingerprint: string,
   envName = 'SYNO_CERT_SHA256',
 ): buildConnector.connector {
-  const connect = buildConnector({ rejectUnauthorized: false })
+  // No TLS session cache: on a resumed session Node reports an empty peer
+  // certificate, so every reconnect after the first would fail the pin
+  // (and a long-running backend would lose the NAS until restarted).
+  // A full handshake per connection is cheap at this request rate.
+  const connect = buildConnector({ rejectUnauthorized: false, maxCachedSessions: 0 })
 
   return (opts, callback) => {
     connect(opts, (err, socket) => {
