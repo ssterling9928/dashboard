@@ -219,7 +219,7 @@ docker compose up -d --build
 
 To deploy a new version, bump the tag in the compose file's `context` and `image`, commit, push the commit and tag, copy the file over and rebuild. Old images stay tagged, so rolling back is changing the tag back.
 
-The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, and joins the existing `private` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports: the dashboard has no login and can start and stop containers, so it's reached only through the reverse proxy. In Nginx Proxy Manager (also on `private`), forward to `http://homelab-dashboard:4000`.
+The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports: the dashboard has no login and can start and stop containers, so it's reached only through the reverse proxy. In Nginx Proxy Manager (also on `private`), forward to `http://homelab-dashboard:4000`.
 
 **Dev:**
 
