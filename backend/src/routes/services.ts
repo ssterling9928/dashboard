@@ -1,18 +1,12 @@
 
 import { Router, type Request } from 'express'
-import { synoRequest } from '../lib/synology.js'
+import { getNasContainers, getNasContainer, nasContainerAction } from '../lib/nasHelper.js'
 import { getTitanContainers, getTitanContainer, titanContainerAction } from '../lib/titan.js'
+import { toService, toServiceDetail } from '../lib/containers.js'
 import { sanitizeInspect } from '../lib/inspect.js'
 import { requestUser } from '../lib/requestGuards.js'
-import {
-  buildServiceUrl,
-  formatUptime,
-  mapTitanPorts,
-  parseDockerPsUptime,
-  parseStatus,
-  splitServiceId,
-} from '../lib/parsers.js'
-import type { Service, ServiceDetail } from '../types/types.js'
+import { splitServiceId } from '../lib/parsers.js'
+import type { Host, Service } from '../types/types.js'
 const router = Router()
 
 // One line per container action: who, what, and whether it worked
@@ -21,120 +15,34 @@ function audit(req: Request, action: string, outcome: 'ok' | 'failed') {
   console.log(`[audit] ${new Date().toISOString()} user=${user} ${action} ${req.params.id} ${outcome}`)
 }
 
-// ── Synology ──────────────────────────────────────────────
+// ── Container helpers ─────────────────────────────────────
+// Vault's containers go through the NAS helper and titan's through the titan
+// helper. Both wrap the docker CLI, so they answer in the same shapes.
 
-export async function listSynologyServices(): Promise<Service[]> {
-  const listData = await synoRequest('SYNO.Docker.Container', 'list', 1, {
-    limit:  '100',
-    offset: '0',
-  })
+const helpers = {
+  synology: {
+    list:    getNasContainers,
+    inspect: getNasContainer,
+    action:  nasContainerAction,
+  },
+  titan: {
+    list:    getTitanContainers,
+    inspect: getTitanContainer,
+    action:  titanContainerAction,
+  },
+} satisfies Record<Host, unknown>
 
-  const containers: any[] = listData.containers ?? []
-
-  const detailResults = await Promise.allSettled(
-    containers.map(c =>
-      synoRequest('SYNO.Docker.Container', 'get', 1, { name: c.name })
-    )
-  )
-
-  return containers.map((c, i) => {
-    const result    = detailResults[i]
-    const detail    = result?.status === 'fulfilled' ? result.value : null
-    const startedAt = detail?.details?.State?.StartedAt
-
-    return {
-      ServiceId:   `synology:${c.name}`,
-      Name:        c.name,
-      Version:     c.image?.split(':')[1] ?? 'unknown',
-      Status:      parseStatus(c.status),
-      Uptime:      formatUptime(startedAt),
-      Type:        'container',
-      Host:        'synology',
-    }
-  })
+async function listServices(host: Host): Promise<Service[]> {
+  const containers = await helpers[host].list()
+  return containers.map(c => toService(host, c))
 }
 
-async function getSynologyServiceDetail(name: string): Promise<ServiceDetail> {
-  const data    = await synoRequest('SYNO.Docker.Container', 'get', 1, { name })
-  const details = data.details
-  const profile = data.profile
-
-  const Ports = (profile.port_bindings ?? []).map((p: any) =>
-    `${p.host_port}:${p.container_port}/${p.type ?? 'tcp'}`
-  )
-
-  const startedInfo = details.State?.StartedAt
-  const formattedStart = new Date(startedInfo).toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).replace(',', '')
-
-  return {
-    ServiceId:        `synology:${profile.name}`,
-    Name:             profile.name,
-    Version:          profile.image?.split(':')[1] ?? 'latest',
-    Status:           parseStatus(details.State?.Status ?? ''),
-    Uptime:           formatUptime(details.State?.StartedAt ?? ''),
-    Type:             'container',
-    Host:             'synology',
-
-    ImageId:          details.Image,
-    ContainerId:      profile.id,
-    RestartPolicy:    details.HostConfig?.RestartPolicy?.Name ?? 'none',
-    Ports,
-    Url:              buildServiceUrl(profile.name),
-    Started:          formattedStart,
-    Restarts:         details.RestartCount,
-    Networks:         Object.keys(details.NetworkSettings.Networks)
-  }
+export function listSynologyServices(): Promise<Service[]> {
+  return listServices('synology')
 }
 
-// ── Titan ─────────────────────────────────────────────────
-
-export async function listTitanServices(): Promise<Service[]> {
-  const containers = await getTitanContainers()
-
-  return containers.map(c => ({
-    ServiceId:   `titan:${c.name}`,
-    Name:        c.name,
-    Version:     c.image?.split(':')[1] ?? 'unknown',
-    Status:      parseStatus(c.state),
-    Uptime:      parseDockerPsUptime(c.status),
-    Type:        'container',
-    Host:        'titan',
-  }))
-}
-
-async function getTitanServiceDetail(name: string): Promise<ServiceDetail> {
-  const inspect = await getTitanContainer(name)
-  const containerName = inspect.Name?.replace(/^\//, '') ?? name
-
-  const startedInfo = inspect.State?.StartedAt ?? ''
-  const formattedStart = startedInfo && !startedInfo.startsWith('0001')
-    ? new Date(startedInfo).toLocaleString('en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).replace(',', '')
-    : 'N/A'
-
-  return {
-    ServiceId:        `titan:${containerName}`,
-    Name:             containerName,
-    Version:          inspect.Config?.Image?.split(':')[1] ?? 'latest',
-    Status:           parseStatus(inspect.State?.Status ?? ''),
-    Uptime:           formatUptime(inspect.State?.StartedAt ?? ''),
-    Type:             'container',
-    Host:             'titan',
-
-    ImageId:          inspect.Image,
-    ContainerId:      inspect.Id,
-    RestartPolicy:    inspect.HostConfig?.RestartPolicy?.Name ?? 'none',
-    Ports:            mapTitanPorts(inspect.NetworkSettings?.Ports),
-    Url:              buildServiceUrl(containerName),
-    Started:          formattedStart,
-    Restarts:         inspect.RestartCount,
-    Networks:         Object.keys(inspect.NetworkSettings?.Networks ?? {})
-  }
+export function listTitanServices(): Promise<Service[]> {
+  return listServices('titan')
 }
 
 // ── GET /api/services ─────────────────────────────────────
@@ -168,9 +76,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const { host, name } = splitServiceId(req.params.id)
 
-    const detail = host === 'synology'
-      ? await getSynologyServiceDetail(name)
-      : await getTitanServiceDetail(name)
+    const detail = toServiceDetail(host, await helpers[host].inspect(name), name)
 
     res.json(detail)
   } catch (err) {
@@ -183,13 +89,9 @@ router.get('/:id/inspect', async (req, res, next) => {
   try {
     const { host, name } = splitServiceId(req.params.id)
 
-    // DSM wraps the inspect output in `details` (env and command also
-    // appear in `profile`, which is never passed on)
-    const raw = host === 'synology'
-      ? (await synoRequest('SYNO.Docker.Container', 'get', 1, { name })).details
-      : await getTitanContainer(name)
-
-    res.json(sanitizeInspect(raw))
+    // The helpers already allow-list the inspect output; sanitizing again
+    // here keeps that true even if a helper is out of date
+    res.json(sanitizeInspect(await helpers[host].inspect(name)))
   } catch (err) {
     next(err)
   }
@@ -200,11 +102,7 @@ router.post('/:id/start', async (req, res, next) => {
   try {
     const { host, name } = splitServiceId(req.params.id)
 
-    if (host === 'synology') {
-      await synoRequest('SYNO.Docker.Container', 'start', 1, { name })
-    } else {
-      await titanContainerAction(name, 'start')
-    }
+    await helpers[host].action(name, 'start')
 
     audit(req, 'start', 'ok')
     res.json({ ok: true, message: `${name} started` })
@@ -219,11 +117,7 @@ router.post('/:id/stop', async (req, res, next) => {
   try {
     const { host, name } = splitServiceId(req.params.id)
 
-    if (host === 'synology') {
-      await synoRequest('SYNO.Docker.Container', 'stop', 1, { name })
-    } else {
-      await titanContainerAction(name, 'stop')
-    }
+    await helpers[host].action(name, 'stop')
 
     audit(req, 'stop', 'ok')
     res.json({ ok: true, message: `${name} stopped` })
@@ -238,13 +132,7 @@ router.post('/:id/restart', async (req, res, next) => {
   try {
     const { host, name } = splitServiceId(req.params.id)
 
-    if (host === 'synology') {
-      await synoRequest('SYNO.Docker.Container', 'stop', 1, { name })
-      await new Promise(r => setTimeout(r, 2000))
-      await synoRequest('SYNO.Docker.Container', 'start', 1, { name })
-    } else {
-      await titanContainerAction(name, 'restart')
-    }
+    await helpers[host].action(name, 'restart')
 
     audit(req, 'restart', 'ok')
     res.json({ ok: true, message: `${name} restarted` })

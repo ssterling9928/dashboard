@@ -1,4 +1,5 @@
 import { getJson, postJson } from './http.js'
+import type { ContainerInspect, ContainerSummary } from './containers.js'
 
 const TITAN_HELPER_URL =
   process.env.TITAN_HELPER_URL?.replace(/\/+$/, '') ?? 'http://YOUR_TITAN_IP:4222'
@@ -6,35 +7,6 @@ const TITAN_HELPER_URL =
 // Full-access token in production; dev uses the helper's read-only token,
 // so start/stop/restart return 403 there
 const AUTH = { Authorization: `Bearer ${process.env.TITAN_HELPER_TOKEN ?? ''}` }
-
-export interface TitanContainerSummary {
-  name:   string
-  image:  string
-  status: string
-  state:  string
-}
-
-// Raw `docker inspect` output shape (only the fields we actually read)
-export interface TitanContainerInspect {
-  Id:      string
-  Image:   string
-  Name:    string
-  State: {
-    Status:     string
-    StartedAt:  string
-  }
-  Config: {
-    Image: string
-  }
-  HostConfig: {
-    RestartPolicy?: { Name: string }
-  }
-  NetworkSettings: {
-    Networks: Record<string, unknown>
-    Ports?:   Record<string, Array<{ HostPort: string }> | null>
-  }
-  RestartCount: number
-}
 
 export interface TitanDiskUsage {
   mount: string
@@ -55,12 +27,12 @@ export interface TitanSystemMetrics {
   timestamp:   number
 }
 
-export async function getTitanContainers(): Promise<TitanContainerSummary[]> {
-  return getJson<TitanContainerSummary[]>(`${TITAN_HELPER_URL}/containers`, undefined, AUTH)
+export async function getTitanContainers(): Promise<ContainerSummary[]> {
+  return getJson<ContainerSummary[]>(`${TITAN_HELPER_URL}/containers`, undefined, AUTH)
 }
 
-export async function getTitanContainer(name: string): Promise<TitanContainerInspect> {
-  return getJson<TitanContainerInspect>(`${TITAN_HELPER_URL}/containers/${encodeURIComponent(name)}`, undefined, AUTH)
+export async function getTitanContainer(name: string): Promise<ContainerInspect> {
+  return getJson<ContainerInspect>(`${TITAN_HELPER_URL}/containers/${encodeURIComponent(name)}`, undefined, AUTH)
 }
 
 export async function titanContainerAction(

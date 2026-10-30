@@ -18,6 +18,8 @@ const HOST = process.env.SYNO_HELPER_HOST ?? ''
 const TLS_CERT = process.env.SYNO_HELPER_TLS_CERT ?? ''
 const TLS_KEY = process.env.SYNO_HELPER_TLS_KEY ?? ''
 const SYNOPKG = process.env.SYNOPKG_PATH ?? '/usr/syno/bin/synopkg'
+// Container Manager's docker CLI. Needs root, like synopkg.
+const DOCKER = process.env.DOCKER_PATH ?? '/usr/local/bin/docker'
 
 // Every route but /health needs a bearer token. SYNO_HELPER_TOKEN allows
 // everything (the production dashboard); SYNO_HELPER_READ_TOKEN, if set,
@@ -253,6 +255,97 @@ async function getPackageStatus(pkgId: string): Promise<string> {
   }
 }
 
+// ── Containers ────────────────────────────────────────────
+// The same endpoints and allow-listed inspect output as titan-helper.ts.
+// Copied rather than shared, since each helper is deployed as a single file.
+
+function assertContainerName(name: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name)) {
+    throw new Error('Invalid container name')
+  }
+}
+
+async function runDocker(args: string[], timeout = 15000): Promise<string> {
+  const { stdout } = await execFileAsync(DOCKER, args, {
+    timeout,
+    maxBuffer: 4 * 1024 * 1024,
+  })
+  return stdout
+}
+
+interface DockerPsEntry {
+  Names:  string
+  Image:  string
+  Status: string
+  State:  string
+}
+
+async function listContainers() {
+  const stdout = await runDocker(['ps', '-a', '--format', '{{json .}}'])
+
+  return stdout
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map((line): DockerPsEntry => JSON.parse(line))
+    .map(entry => ({
+      name:   entry.Names,
+      image:  entry.Image,
+      status: entry.Status,
+      state:  entry.State,
+    }))
+}
+
+// Copy only the listed keys (one level) from an object, if present
+function pick(source: any, keys: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (!source || typeof source !== 'object') return out
+  for (const key of keys) {
+    if (key in source) out[key] = source[key]
+  }
+  return out
+}
+
+// Allow-list of `docker inspect` fields the dashboard uses. Env values,
+// Cmd/Entrypoint/Args, Labels and healthcheck output never leave the NAS:
+// any of them can hold secrets, and even the read-only token can call this.
+// Env is reduced to variable names.
+function safeInspect(raw: any) {
+  const env: unknown[] = Array.isArray(raw?.Config?.Env) ? raw.Config.Env : []
+
+  return {
+    ...pick(raw, ['Id', 'Name', 'Created', 'Image', 'RestartCount']),
+    State: {
+      ...pick(raw?.State, ['Status', 'Running', 'Paused', 'Restarting', 'OOMKilled', 'ExitCode', 'StartedAt', 'FinishedAt']),
+      ...(raw?.State?.Health ? { Health: pick(raw.State.Health, ['Status']) } : {}),
+    },
+    Config: {
+      ...pick(raw?.Config, ['Image', 'User', 'WorkingDir', 'ExposedPorts']),
+      Env: env.filter((e): e is string => typeof e === 'string').map(e => e.split('=')[0]),
+    },
+    HostConfig: pick(raw?.HostConfig, ['RestartPolicy', 'NetworkMode', 'Privileged', 'ReadonlyRootfs', 'CapAdd', 'PortBindings']),
+    Mounts: (Array.isArray(raw?.Mounts) ? raw.Mounts : [])
+      .map((m: any) => pick(m, ['Type', 'Source', 'Destination', 'Mode', 'RW'])),
+    NetworkSettings: {
+      ...pick(raw?.NetworkSettings, ['Ports']),
+      Networks: Object.fromEntries(
+        Object.entries(raw?.NetworkSettings?.Networks ?? {})
+          .map(([net, cfg]) => [net, pick(cfg, ['IPAddress', 'Gateway', 'MacAddress', 'Aliases'])])
+      ),
+    },
+  }
+}
+
+async function inspectContainer(name: string) {
+  assertContainerName(name)
+  const stdout = await runDocker(['inspect', name])
+  const parsed = JSON.parse(stdout)
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error(`Container not found: ${name}`)
+  }
+  return safeInspect(parsed[0])
+}
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
@@ -328,6 +421,34 @@ app.get('/packages/:id', async (req, res) => {
     })
   }
 })
+
+app.get('/containers', async (_req, res) => {
+  try {
+    res.json(await listContainers())
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? 'Unknown error' })
+  }
+})
+
+app.get('/containers/:name', async (req, res) => {
+  try {
+    res.json(await inspectContainer(req.params.name))
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? 'Unknown error' })
+  }
+})
+
+for (const action of ['start', 'stop', 'restart'] as const) {
+  app.post(`/containers/:name/${action}`, async (req, res) => {
+    try {
+      assertContainerName(req.params.name)
+      await runDocker([action, req.params.name], 60000)
+      res.json({ ok: true })
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message ?? 'Unknown error' })
+    }
+  })
+}
 
 const server = createServer(
   { cert: readFileSync(TLS_CERT), key: readFileSync(TLS_KEY), minVersion: 'TLSv1.3' },

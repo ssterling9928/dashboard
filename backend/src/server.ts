@@ -2,7 +2,7 @@ import 'dotenv/config'
 import express from "express";
 import path from "path";
 import servicesRouter from "./routes/services.js"
-import metricsRouter from "./routes/metrics.js"
+import metricsRouter, { saveMetricHistory } from "./routes/metrics.js"
 import logsRouter from "./routes/logs.js"
 import packagesRouter from "./routes/packages.js"
 import statusRouter from "./routes/status.js"
@@ -79,6 +79,18 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
   res.status(500).json({ error: err.message })
 })
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
 });
+
+// `docker stop` and redeploys send SIGTERM (Ctrl+C sends SIGINT). Save the
+// metric history before exiting. As PID 1 in the container, Node would
+// otherwise ignore SIGTERM and be killed 10s later without saving.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, async () => {
+    console.log(`${signal} received, saving metric history`)
+    server.close()
+    await saveMetricHistory()
+    process.exit(0)
+  })
+}

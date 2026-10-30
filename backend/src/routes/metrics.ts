@@ -10,6 +10,7 @@ import {
 } from '../lib/metricMath.js'
 import type { MetricPoint, Host } from '../types/types.js'
 import type { HostSnapshot, VaultHealth } from '../lib/hostHealth.js'
+import { loadHistory, saveHistory } from '../lib/historyStore.js'
 
 const router = Router()
 
@@ -323,9 +324,50 @@ async function pollMetrics() {
   }
 }
 
-// Start polling immediately then every 30s
-pollMetrics()
-setInterval(pollMetrics, POLL_INTERVAL_MS)
+// ── Saved history ─────────────────────────────────────────
+// With HISTORY_FILE set (the Docker image sets it to a mounted volume), the
+// charts survive a redeploy or reboot. Unset, history is memory-only.
+const HISTORY_FILE = process.env.HISTORY_FILE ?? ''
+const SAVE_INTERVAL_MS = 5 * 60 * 1000
+const METRIC_TYPES = ['cpu', 'memory', 'network']
+
+async function restoreHistory() {
+  if (!HISTORY_FILE) return
+  const saved = await loadHistory(HISTORY_FILE)
+  if (!saved) return
+
+  let points = 0
+  for (const host of Object.keys(history) as Host[]) {
+    for (const type of METRIC_TYPES) {
+      const series = saved.history[host][type]
+      if (series) { history[host][type] = series; points += series.length }
+    }
+    for (const [volume, series] of Object.entries(saved.diskHistory[host])) {
+      diskHistory[host][volume] = series
+      points += series.length
+    }
+  }
+  console.log(`Restored ${points} metric readings from ${HISTORY_FILE}`)
+}
+
+// Saves run one at a time, so the timer and a shutdown never write at once
+let saving: Promise<void> = Promise.resolve()
+
+export function saveMetricHistory(): Promise<void> {
+  if (!HISTORY_FILE) return Promise.resolve()
+  saving = saving
+    .then(() => saveHistory(HISTORY_FILE, { history, diskHistory }))
+    .catch(err => console.error(`Could not save metric history to ${HISTORY_FILE}: ${err?.message ?? err}`))
+  return saving
+}
+
+// Restore first, so the first poll adds to the saved history instead of
+// being overwritten by it. Then poll immediately and every 30s.
+restoreHistory().finally(() => {
+  pollMetrics()
+  setInterval(pollMetrics, POLL_INTERVAL_MS)
+  if (HISTORY_FILE) setInterval(saveMetricHistory, SAVE_INTERVAL_MS)
+})
 
 // GET /api/metrics?type=cpu&range=24&host=synology
 // GET /api/metrics?type=disk&range=24&volume=volume1&host=titan

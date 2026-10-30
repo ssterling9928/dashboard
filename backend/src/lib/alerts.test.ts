@@ -53,18 +53,22 @@ describe('reachabilityAlerts', () => {
     expect(reachabilityAlerts({ ...allUp, vault: pending, titan: pending })).toEqual([])
   })
 
-  it('flags Vault SNMP, DSM and the package helper separately', () => {
+  it('flags Vault SNMP and the NAS helper separately, with one helper alert', () => {
     const alerts = reachabilityAlerts({
       ...allUp,
       vault: snapshot({ online: false, error: 'RequestTimedOutError' }),
-      synologyServices: failed(new Error('DSM down')),
+      synologyServices: failed(new Error('helper down')),
       synologyHelper: failed(new Error('helper down')),
     })
     expect(titles(alerts)).toEqual([
       'critical: Vault not responding to SNMP',
-      'critical: Vault DSM API unreachable',
-      'warning: Vault package helper unreachable',
+      'critical: Vault helper unreachable',
     ])
+  })
+
+  it('flags Vault containers when the helper is up but listing fails', () => {
+    const alerts = reachabilityAlerts({ ...allUp, synologyServices: failed(new Error('docker: not found')) })
+    expect(titles(alerts)).toEqual(['critical: Vault containers unavailable'])
   })
 
   it('reports the underlying network error instead of "fetch failed"', () => {
