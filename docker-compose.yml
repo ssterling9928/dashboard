@@ -18,11 +18,13 @@ services:
     environment:
       PORT: 4000              # the image listens on 4000; overrides backend.env
       TZ: America/Chicago     # log timestamps are shown in local time
-    # Nothing is written to disk (history is in memory), so lock the
-    # container down: read-only filesystem, no Linux capabilities, no setuid.
+    # Lock the container down: read-only filesystem, no Linux capabilities,
+    # no setuid. The only writable places are /tmp and the history volume.
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      - history:/data         # metric history, kept across redeploys and reboots
     cap_drop:
       - ALL
     security_opt:
@@ -32,6 +34,9 @@ services:
     # (also on "private_titan") forwards to http://homelab-dashboard:4000.
     networks:
       - private_titan         # reaches Loki by name and titan-helper at the gateway
+
+volumes:
+  history:                    # created by compose as homelab-dashboard_history
 
 networks:
   private_titan:

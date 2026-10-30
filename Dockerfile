@@ -28,7 +28,8 @@ RUN cd backend && npm run build
 FROM node:22-alpine
 ENV NODE_ENV=production \
     PORT=4000 \
-    STATIC_DIR=/app/public
+    STATIC_DIR=/app/public \
+    HISTORY_FILE=/data/history.json
 WORKDIR /app/backend
 
 COPY backend/package.json backend/package-lock.json backend/.npmrc ./
@@ -36,6 +37,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=backend  /app/backend/dist  ./dist
 COPY --from=frontend /app/frontend/dist /app/public
+
+# Metric history is saved here (a volume in docker-compose.yml). Owned by
+# node so a new named volume starts out writable by it.
+RUN mkdir /data && chown node:node /data
 
 USER node
 EXPOSE 4000

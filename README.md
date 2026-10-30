@@ -57,13 +57,15 @@ flowchart LR
     subgraph Vault["Vault (Synology DS423+)"]
         SNMP["SNMP agent"]
         DSM["DSM Web API"]
-        NasHelper["host-helper<br/>(synopkg)"]
+        NasHelper["host-helper<br/>(synopkg, docker CLI)"]
+        NasDocker[["Container Manager"]]
+        NasHelper -->|docker CLI| NasDocker
     end
 
     Backend -->|"HTTP · bearer token · Docker bridge gateway"| Helper
     Backend -->|LogQL| Loki
     Backend -->|"SNMP v2c · every 30s"| SNMP
-    Backend -->|"HTTPS · session auth"| DSM
+    Backend -->|"HTTPS · session auth · logs only"| DSM
     Backend -->|"HTTPS · pinned cert · bearer token"| NasHelper
 ```
 
@@ -72,7 +74,7 @@ flowchart LR
 | CPU, memory, disk, network | SNMP (UCD-SNMP and HOST-RESOURCES MIBs) | titan-helper `/system` (`/proc/stat`, `/proc/meminfo`, `df`, `/proc/net/dev`) |
 | Uptime, load average | SNMP (`hrSystemUptime`, `laLoad`) | titan-helper (`/proc/uptime`, `/proc/loadavg`) |
 | Hardware health | SNMP, Synology MIB (`1.3.6.1.4.1.6574`) | n/a (it's a VM) |
-| Containers, and starting / stopping them | DSM API (`SYNO.Docker.Container`) | titan-helper (`docker ps`, `inspect`, `start`, `stop`, `restart`) |
+| Containers, and starting / stopping them | host-helper (`docker ps`, `inspect`, `start`, `stop`, `restart`) | titan-helper (the same endpoints) |
 | Logs | DSM API (`SYNO.Core.SyslogClient`) | Loki (`{host="titan"}`) |
 | Packages | host-helper (`synopkg`, `/var/packages`) | n/a |
 
@@ -87,10 +89,10 @@ The simplest way to manage Titan's containers would be to mount `/var/run/docker
 Raw `docker inspect` carries every secret a container was given: environment values, command-line flags, labels (for example proxy basic-auth hashes) and healthcheck commands. Rather than trying to remove those, [`inspect.ts`](backend/src/lib/inspect.ts) builds a new object from a fixed list of safe fields, so a field Docker adds later can't leak by default. The Titan helper applies its own allow-list too, because even its read-only token can call inspect.
 
 **The NAS is trusted by certificate fingerprint, and credentials never go in a URL.**
-DSM serves a certificate that normal TLS checks can't accept: its issuer (Cloudflare's Origin CA) isn't publicly trusted, and the backend connects by IP. Rather than switching verification off, which would hand the DSM password to anything on the LAN that answers as the NAS, [`certPin.ts`](backend/src/lib/certPin.ts) accepts exactly one certificate, by its SHA-256 fingerprint (`SYNO_CERT_SHA256`), and checks it before any request is sent. TLS session resumption is turned off, so every connection does a full handshake and proves the certificate again (a resumed session reports no certificate, which would make reconnects fail the pin). Without a valid fingerprint the backend refuses to contact DSM at all. The NAS helper is reached the same way: its token crosses the LAN (unlike the Titan helper's, which never leaves the host), so it serves only HTTPS (TLS 1.3) with its own self-signed certificate, pinned by `SYNO_HELPER_CERT_SHA256`. Every DSM call is a POST with the password or session ID in the body, so they never land in access logs. The DSM account is a dedicated, locked-down admin (Container Manager has no non-admin access), not a personal one.
+DSM serves a certificate that normal TLS checks can't accept: its issuer (Cloudflare's Origin CA) isn't publicly trusted, and the backend connects by IP. Rather than switching verification off, which would hand the DSM password to anything on the LAN that answers as the NAS, [`certPin.ts`](backend/src/lib/certPin.ts) accepts exactly one certificate, by its SHA-256 fingerprint (`SYNO_CERT_SHA256`), and checks it before any request is sent. TLS session resumption is turned off, so every connection does a full handshake and proves the certificate again (a resumed session reports no certificate, which would make reconnects fail the pin). Without a valid fingerprint the backend refuses to contact DSM at all. The NAS helper is reached the same way: its token crosses the LAN (unlike the Titan helper's, which never leaves the host), so it serves only HTTPS (TLS 1.3) with its own self-signed certificate, pinned by `SYNO_HELPER_CERT_SHA256`. Every DSM call is a POST with the password or session ID in the body, so they never land in access logs. The DSM account is a dedicated, locked-down admin, not a personal one. It's now used only for Vault's logs; containers moved to the NAS helper, so the read-only dev token can't start or stop them, and the account goes away once the logs move to Loki.
 
-**One poll, kept in memory, thinned out for charts.**
-The backend polls every source once every 30 seconds and keeps a 24-hour buffer for each metric (2,880 readings). Requests are answered from memory, so the charts never wait on SNMP. Ranges are selected by timestamp, and long ranges are reduced to at most 288 points by keeping the highest reading from each group, so a 30-second spike isn't averaged away. Current, average and peak values are still calculated from every reading.
+**One poll, kept in memory and saved to a file, thinned out for charts.**
+The backend polls every source once every 30 seconds and keeps a 24-hour buffer for each metric (2,880 readings). The buffers are saved to one JSON file every 5 minutes and on shutdown, and read back on start, so a redeploy or reboot leaves only a gap in the charts ([`historyStore.ts`](backend/src/lib/historyStore.ts); about 1–2 MB). A Prometheus server would add longer retention and PromQL, but for 24 hours of a dozen series it would be one more service to run for no visible gain. Requests are answered from memory, so the charts never wait on SNMP. Ranges are selected by timestamp, and long ranges are reduced to at most 288 points by keeping the highest reading from each group, so a 30-second spike isn't averaged away. Current, average and peak values are still calculated from every reading.
 
 **Alerts come from data the backend already has.**
 Status and alerts are worked out from the poll results already in memory, plus one container listing per request. The rules are pure functions in [`alerts.ts`](backend/src/lib/alerts.ts). Thresholds and the meaning of each Synology status code are plain constants there, so each rule is easy to read, change and test.
@@ -133,19 +135,21 @@ dashboard/
 │           ├── metricMath.ts      # range selection, downsampling, summaries (pure, unit-tested)
 │           ├── inspect.ts         # allow-listed docker inspect for the Inspect view (pure, unit-tested)
 │           ├── parsers.ts         # Docker, syslog and timestamp parsers (pure, unit-tested)
-│           ├── synology.ts        # DSM Web API client with session refresh
+│           ├── synology.ts        # DSM Web API client with session refresh (Vault logs)
 │           ├── certPin.ts         # trust one certificate by SHA-256 fingerprint (DSM and the NAS helper)
 │           ├── nasHelper.ts       # client for the NAS helper (pinned HTTPS, bearer token)
 │           ├── snmp.ts            # SNMP get/walk and OID definitions
 │           ├── titan.ts           # client for the Titan helper
 │           ├── loki.ts            # Loki query_range client
 │           ├── titan-helper.ts    # agent that runs on Titan (systemd)
-│           └── host-helper.ts     # agent that runs on the NAS (synopkg)
+│           └── host-helper.ts     # agent that runs on the NAS (synopkg, docker CLI)
 ├── frontend/
 │   └── src/
 │       ├── pages/Dashboard.tsx
 │       ├── components/            # cards, tabs, charts, modals, badges
 │       ├── hooks/                 # TanStack Query hooks for each endpoint
+│           ├── historyStore.ts    # saves and restores metric history (HISTORY_FILE)
+│           ├── containers.ts      # maps both helpers' docker output to services
 │       ├── utils/                 # formatting, log collapsing, saved ranges, theme (unit-tested)
 │       └── config/                # sidebar quick links, API base URL
 ├── shared/
@@ -197,7 +201,7 @@ LOKI_URL=http://loki:3100
 PROXY_SECRET=<openssl rand -hex 32>   # production only; the same value goes in NPM (see Login below)
 ```
 
-There are two ways to run it, and they don't interfere with each other. Each has its own backend and its own in-memory history.
+There are two ways to run it, and they don't interfere with each other. Each has its own backend and its own history. The container saves its history to a Docker volume; dev keeps it in memory unless `HISTORY_FILE` is set in `backend.env`.
 
 | | Container | Dev |
 |---|---|---|
@@ -221,7 +225,7 @@ docker compose up -d --build
 
 To deploy a new version: tag and push it, put its full commit hash in the compose file's `context` (`…dashboard.git#<hash>`) and its tag in `image`, commit and push that, copy the file over and rebuild. Old images stay tagged, so rolling back is putting the previous hash and tag back.
 
-The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports, so the dashboard is reached only through Nginx Proxy Manager, which also provides the login.
+The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, keeps metric history in the `history` volume (the only writable place besides `/tmp`), and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports, so the dashboard is reached only through Nginx Proxy Manager, which also provides the login.
 
 **Login (Nginx Proxy Manager).** NPM asks for a password, and the backend makes sure that can't be skipped or abused (see [`requestGuards.ts`](backend/src/lib/requestGuards.ts)):
 
@@ -265,7 +269,7 @@ npm install express dotenv tsx
 npx tsx titan-helper.ts                 # or run it as a systemd service
 ```
 
-**NAS helper:** runs on the NAS as root (`synopkg` needs it), started by a boot-time Task Scheduler task. Keep its folder and `.env` outside every shared folder and readable only by root: anyone who could edit a script that root runs would have root on the NAS. It refuses to start without an explicit LAN address, a certificate and key, and a token.
+**NAS helper:** runs on the NAS as root (`synopkg` and Container Manager's `docker` need it), started by a boot-time Task Scheduler task. Keep its folder and `.env` outside every shared folder and readable only by root: anyone who could edit a script that root runs would have root on the NAS. It refuses to start without an explicit LAN address, a certificate and key, and a token.
 
 ```bash
 # Self-signed certificate (the dashboard pins its fingerprint, so no CA is involved)
@@ -290,12 +294,13 @@ SYNO_HELPER_READ_TOKEN=<openssl rand -hex 32>   # optional; GET only, for dev
 The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, inspect sanitizing (with planted secrets), the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
-cd backend  && npm test     # 93 tests
+cd backend  && npm test     # 102 tests
 cd frontend && npm test     # 20 tests
 npm test                    # both, from the repo root
 ```
 
 ---
+DOCKER_PATH=/usr/local/bin/docker               # optional; Container Manager's docker CLI (the default)
 
 ## Roadmap
 
@@ -307,7 +312,8 @@ npm test                    # both, from the repo root
 - [x] Token authentication for the Titan helper, with a read-only token for dev
 - [x] Token authentication and pinned HTTPS for the NAS helper
 - [x] A login in front of the dashboard (NPM basic auth, with a proxy secret and CSRF protection so it can't be bypassed)
-- [ ] Metric history that survives restarts (Prometheus), for 7-day charts
+- [x] Metric history that survives restarts (saved to a file on a volume)
+- [ ] 7-day charts
 - [x] Dark mode
 
 ---

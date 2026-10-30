@@ -56,11 +56,12 @@ export function reachabilityAlerts(input: ReachabilityInput): Alert[] {
   if (!vault.online && vault.error) {
     alerts.push(alert('critical', 'synology', 'snmp', 'Vault not responding to SNMP', vault.error))
   }
-  if (synologyServices.status === 'rejected') {
-    alerts.push(alert('critical', 'synology', 'dsm', 'Vault DSM API unreachable', describeError(synologyServices.reason)))
-  }
+  // The NAS helper serves both containers and packages: one alert if it's
+  // down, a separate one if it's up but listing containers failed
   if (synologyHelper.status === 'rejected') {
-    alerts.push(alert('warning', 'synology', 'helper', 'Vault package helper unreachable', describeError(synologyHelper.reason)))
+    alerts.push(alert('critical', 'synology', 'helper', 'Vault helper unreachable', describeError(synologyHelper.reason)))
+  } else if (synologyServices.status === 'rejected') {
+    alerts.push(alert('critical', 'synology', 'containers', 'Vault containers unavailable', describeError(synologyServices.reason)))
   }
   if ((!titan.online && titan.error) || titanServices.status === 'rejected') {
     const detail = titan.error ?? (titanServices.status === 'rejected' ? describeError(titanServices.reason) : '')

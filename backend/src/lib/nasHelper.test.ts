@@ -20,6 +20,7 @@ describe.skipIf(!hasOpenssl)('NAS helper client', () => {
   let url: string
   let fingerprint: string
   const authHeaders: Array<string | undefined> = []
+  const requests: string[] = []
 
   beforeAll(async () => {
     dir = mkdtempSync(path.join(tmpdir(), 'nashelper-'))
@@ -33,6 +34,7 @@ describe.skipIf(!hasOpenssl)('NAS helper client', () => {
     fingerprint = new X509Certificate(readFileSync(cert)).fingerprint256
     server = createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (req, res) => {
       authHeaders.push(req.headers.authorization)
+      requests.push(`${req.method} ${req.url}`)
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify([{ id: 'Pkg', name: 'Pkg', version: '1.0', type: 'package' }]))
     })
@@ -49,6 +51,7 @@ describe.skipIf(!hasOpenssl)('NAS helper client', () => {
 
   beforeEach(() => {
     authHeaders.length = 0
+    requests.length = 0
     vi.resetModules()   // the client reads its settings when first imported
   })
 
@@ -78,5 +81,13 @@ describe.skipIf(!hasOpenssl)('NAS helper client', () => {
     const err = await client.getNasPackages().then(() => null, (e: Error) => e)
     expect(err?.message).toMatch(/NAS helper unreachable: .*SYNO_HELPER_CERT_SHA256/)
     expect(authHeaders).toEqual([])
+  })
+
+  it('sends container actions as POSTs to the container\'s path', async () => {
+    const client = await loadClient({ SYNO_HELPER_CERT_SHA256: fingerprint })
+    await client.nasContainerAction('node-exporter', 'restart')
+    await client.getNasContainer('a b')
+    expect(requests).toEqual(['POST /containers/node-exporter/restart', 'GET /containers/a%20b'])
+    expect(authHeaders).toEqual([`Bearer ${TOKEN}`, `Bearer ${TOKEN}`])
   })
 })
