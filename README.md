@@ -153,7 +153,7 @@ dashboard/
 ├── scripts/dev.sh                 # dev mode: backend and Vite together
 ├── package.json                   # npm run dev / test
 ├── Dockerfile                     # builds both, runs the backend serving the frontend
-└── docker-compose.yml             # production compose: builds a tagged release from GitHub
+└── docker-compose.yml             # production compose: builds a pinned commit from GitHub
 ```
 
 ---
@@ -194,6 +194,7 @@ SYNO_HELPER_TOKEN=<token>       # the NAS helper's full token in production, its
 TITAN_HELPER_URL=http://<docker-gateway-ip>:4222
 TITAN_HELPER_TOKEN=<token>      # the helper's full token in production, its read-only token in dev
 LOKI_URL=http://loki:3100
+PROXY_SECRET=<openssl rand -hex 32>   # production only; the same value goes in NPM (see Login below)
 ```
 
 There are two ways to run it, and they don't interfere with each other. Each has its own backend and its own in-memory history.
@@ -202,14 +203,15 @@ There are two ways to run it, and they don't interfere with each other. Each has
 |---|---|---|
 | Command | `docker compose up -d --build` (on Titan, from `/opt`) | `npm run dev` (repo root) |
 | What runs | one container: the backend also serves the built frontend | `tsx watch` backend on :4000 and the Vite dev server on :5173 |
-| Picks up changes | when you tag a release and rebuild | on save |
+| Picks up changes | when you release a commit and rebuild | on save |
 | Used for | the dashboard you actually use | trying changes before deploying them |
 
-**Container** (on Titan, where Docker runs). The deploy never reads the workspace: [`docker-compose.yml`](docker-compose.yml) builds a tagged release straight from GitHub, so an edit that isn't committed, pushed and tagged can't reach production.
+**Container** (on Titan, where Docker runs). The deploy never reads the workspace: [`docker-compose.yml`](docker-compose.yml) builds a release straight from GitHub, pinned by its full commit hash rather than its tag. Tags can be moved or recreated by anyone who can push to the repo; a commit hash can't, so a later push can't change what a rebuild produces.
 
 ```bash
 # in the repo: release a version
-git tag v1.0.0 && git push origin main v1.0.0
+git tag v1.0.3 && git push origin main v1.0.3
+git rev-parse v1.0.3          # the full hash goes in the compose file's build context
 
 # on Titan
 cd /opt/docker/compose/homelab-dashboard   # docker-compose.yml (copied from the repo) + backend.env
@@ -217,9 +219,22 @@ chmod 600 backend.env
 docker compose up -d --build
 ```
 
-To deploy a new version, bump the tag in the compose file's `context` and `image`, commit, push the commit and tag, copy the file over and rebuild. Old images stay tagged, so rolling back is changing the tag back.
+To deploy a new version: tag and push it, put its full commit hash in the compose file's `context` (`…dashboard.git#<hash>`) and its tag in `image`, commit and push that, copy the file over and rebuild. Old images stay tagged, so rolling back is putting the previous hash and tag back.
 
-The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports: the dashboard has no login and can start and stop containers, so it's reached only through the reverse proxy. In Nginx Proxy Manager (also on `private`), forward to `http://homelab-dashboard:4000`.
+The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports, so the dashboard is reached only through Nginx Proxy Manager, which also provides the login.
+
+**Login (Nginx Proxy Manager).** NPM asks for a password, and the backend makes sure that can't be skipped or abused (see [`requestGuards.ts`](backend/src/lib/requestGuards.ts)):
+
+1. **Access list:** *Satisfy All* (both rules must pass), an *Authorization* user with a long generated password, *Access* allowing your LAN subnet and denying everything else, and *Pass Auth to Host* off, so the password never reaches the app.
+2. **Proxy host** for the dashboard's domain: apply the access list, force SSL and turn on HSTS. Under *Custom locations*, add location `/` forwarding to `http` `homelab-dashboard` port `4000`, and in its advanced settings:
+   ```nginx
+   proxy_set_header X-Proxy-Secret <same value as PROXY_SECRET>;
+   proxy_set_header X-Remote-User $remote_user;
+   ```
+   (A custom location is needed because nginx drops server-level `proxy_set_header` lines when the location sets its own, which NPM's default location does.)
+3. **Check:** without the password, `curl https://<domain>/api/status` gets 401 (or 403 from outside the LAN). With it, it gets data.
+
+Without `X-Proxy-Secret` the backend answers 403, so anything that reaches the container directly on the Docker network gets nothing. In production it won't start without `PROXY_SECRET`. Actions (start, stop, restart) also need a header that only the dashboard's own page sends, and the API offers no CORS, so a malicious page can't use the browser's saved login to trigger them. Each action is logged with the NPM username.
 
 **Dev:**
 
@@ -275,7 +290,7 @@ SYNO_HELPER_READ_TOKEN=<openssl rand -hex 32>   # optional; GET only, for dev
 The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, inspect sanitizing (with planted secrets), the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
-cd backend  && npm test     # 82 tests
+cd backend  && npm test     # 93 tests
 cd frontend && npm test     # 20 tests
 npm test                    # both, from the repo root
 ```
@@ -291,7 +306,7 @@ npm test                    # both, from the repo root
 - [ ] systemd unit for the Titan helper in the repo
 - [x] Token authentication for the Titan helper, with a read-only token for dev
 - [x] Token authentication and pinned HTTPS for the NAS helper
-- [ ] A login in front of the dashboard
+- [x] A login in front of the dashboard (NPM basic auth, with a proxy secret and CSRF protection so it can't be bypassed)
 - [ ] Metric history that survives restarts (Prometheus), for 7-day charts
 - [x] Dark mode
 

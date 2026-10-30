@@ -1,8 +1,9 @@
 
-import { Router } from 'express'
+import { Router, type Request } from 'express'
 import { synoRequest } from '../lib/synology.js'
 import { getTitanContainers, getTitanContainer, titanContainerAction } from '../lib/titan.js'
 import { sanitizeInspect } from '../lib/inspect.js'
+import { requestUser } from '../lib/requestGuards.js'
 import {
   buildServiceUrl,
   formatUptime,
@@ -13,6 +14,12 @@ import {
 } from '../lib/parsers.js'
 import type { Service, ServiceDetail } from '../types/types.js'
 const router = Router()
+
+// One line per container action: who, what, and whether it worked
+function audit(req: Request, action: string, outcome: 'ok' | 'failed') {
+  const user = requestUser(req, req.app.locals.proxyEnforced === true)
+  console.log(`[audit] ${new Date().toISOString()} user=${user} ${action} ${req.params.id} ${outcome}`)
+}
 
 // ── Synology ──────────────────────────────────────────────
 
@@ -199,8 +206,10 @@ router.post('/:id/start', async (req, res, next) => {
       await titanContainerAction(name, 'start')
     }
 
+    audit(req, 'start', 'ok')
     res.json({ ok: true, message: `${name} started` })
   } catch (err) {
+    audit(req, 'start', 'failed')
     next(err)
   }
 })
@@ -216,8 +225,10 @@ router.post('/:id/stop', async (req, res, next) => {
       await titanContainerAction(name, 'stop')
     }
 
+    audit(req, 'stop', 'ok')
     res.json({ ok: true, message: `${name} stopped` })
   } catch (err) {
+    audit(req, 'stop', 'failed')
     next(err)
   }
 })
@@ -235,8 +246,10 @@ router.post('/:id/restart', async (req, res, next) => {
       await titanContainerAction(name, 'restart')
     }
 
+    audit(req, 'restart', 'ok')
     res.json({ ok: true, message: `${name} restarted` })
   } catch (err) {
+    audit(req, 'restart', 'failed')
     next(err)
   }
 })

@@ -27,7 +27,12 @@ export function useServiceDetail(id: string | null) {
 }
 
 export async function containerAction(id: string, action: 'start' | 'stop' | 'restart') {
-  const res = await fetch(`${API}/api/services/${id}/${action}`, { method: 'POST' })
+  // The backend refuses state-changing requests without this header (CSRF):
+  // a cross-site page can't add it, because the API offers no CORS
+  const res = await fetch(`${API}/api/services/${id}/${action}`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'homelab-dashboard' },
+  })
   if (!res.ok) throw new Error(`Failed to ${action} container`)
   return res.json()
 }
