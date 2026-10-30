@@ -38,8 +38,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=backend  /app/backend/dist  ./dist
 COPY --from=frontend /app/frontend/dist /app/public
 
-# Metric history is saved here (a volume in docker-compose.yml). Owned by
-# node so a new named volume starts out writable by it.
+# Metric history is saved here (bind-mounted from the host in
+# docker-compose.yml; the host folder must be owned by uid 1000, "node").
 RUN mkdir /data && chown node:node /data
 
 USER node

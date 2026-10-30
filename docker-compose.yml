@@ -23,8 +23,12 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    # Metric history, kept across redeploys and reboots. The folder must be
+    # owned by uid 1000 (the image's "node" user), or saving fails:
+    #   sudo mkdir -p /opt/docker/data/homelab-dashboard
+    #   sudo chown 1000:1000 /opt/docker/data/homelab-dashboard
     volumes:
-      - history:/data         # metric history, kept across redeploys and reboots
+      - /opt/docker/data/homelab-dashboard:/data
     cap_drop:
       - ALL
     security_opt:
@@ -34,9 +38,6 @@ services:
     # (also on "private_titan") forwards to http://homelab-dashboard:4000.
     networks:
       - private_titan         # reaches Loki by name and titan-helper at the gateway
-
-volumes:
-  history:                    # created by compose as homelab-dashboard_history
 
 networks:
   private_titan:
