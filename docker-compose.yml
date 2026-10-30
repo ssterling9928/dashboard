@@ -1,14 +1,17 @@
 # Production compose, copied as-is to /opt/docker/compose/homelab-dashboard/
 # with backend.env beside it. The image is built from GitHub, never from a
-# local checkout. To deploy a new version: bump the tag in `context` and
-# `image`, commit, push the commit and the tag, copy this file, rebuild.
+# local checkout, and pinned by full commit hash: a tag can be moved or
+# recreated by anyone who can push, a commit hash can't.
+# To deploy a new version: tag and push it, put its full hash
+# (`git rev-parse <tag>`) in `context` and its tag in `image`, commit and
+# push this file, copy it over, rebuild.
 services:
   dashboard:
     build:
-      context: https://github.com/ssterling9928/dashboard.git#v1.0.2
+      context: https://github.com/ssterling9928/dashboard.git#9fd215d6c8a875fb07bd30144b74710def6da6fb   # v1.0.3
       args:
         VITE_GRAFANA_URL: https://grafana.home.sterling-dev.com   # optional
-    image: homelab-dashboard:v1.0.2   # older versions stay around for rollback
+    image: homelab-dashboard:v1.0.3   # older versions stay around for rollback
     container_name: homelab-dashboard
     restart: unless-stopped
     env_file: ./backend.env           # secrets live beside this file, not in the repo
