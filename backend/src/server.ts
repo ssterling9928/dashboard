@@ -1,6 +1,5 @@
 import 'dotenv/config'
 import express from "express";
-import cors from "cors";
 import path from "path";
 import servicesRouter from "./routes/services.js"
 import metricsRouter from "./routes/metrics.js"
@@ -8,9 +7,25 @@ import logsRouter from "./routes/logs.js"
 import packagesRouter from "./routes/packages.js"
 import statusRouter from "./routes/status.js"
 import { UpstreamError } from "./lib/http.js"
+import { MIN_SECRET_LENGTH, csrfGuard, proxySecretGuard, securityHeaders } from "./lib/requestGuards.js"
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const PRODUCTION = process.env.NODE_ENV === 'production'
+
+// The shared secret NPM adds to every request it forwards (see
+// requestGuards.ts). Required in production, so the container fails to start
+// rather than run without it. Dev has no NPM in front, so it's skipped there.
+const PROXY_SECRET = process.env.PROXY_SECRET ?? ''
+if (PRODUCTION && PROXY_SECRET.length < MIN_SECRET_LENGTH) {
+  console.error(`PROXY_SECRET must be set to at least ${MIN_SECRET_LENGTH} characters in production (openssl rand -hex 32)`)
+  process.exit(1)
+}
+const proxyEnforced = PROXY_SECRET.length > 0
+if (!proxyEnforced) console.warn('PROXY_SECRET is not set: requests are not checked for the proxy secret (dev only)')
+app.locals.proxyEnforced = proxyEnforced
+
+app.disable('x-powered-by')
 
 // The code-server proxy forwards requests to this port with the
 // "/proxy/<port>" prefix left on the path (mirrors frontend/vite.config.ts),
@@ -23,8 +38,13 @@ app.use((req, _res, next) => {
   next()
 })
 
-app.use(cors());
+// No CORS: the frontend is served from the same origin (by this server in
+// production, through Vite's proxy or code-server's in dev), so no other
+// site is ever allowed to read the API or send it non-simple requests.
+app.use(securityHeaders)
+if (proxyEnforced) app.use(proxySecretGuard(PROXY_SECRET))
 app.use(express.json());
+app.use('/api', csrfGuard)
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
