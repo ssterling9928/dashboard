@@ -201,7 +201,7 @@ LOKI_URL=http://loki:3100
 PROXY_SECRET=<openssl rand -hex 32>   # production only; the same value goes in NPM (see Login below)
 ```
 
-There are two ways to run it, and they don't interfere with each other. Each has its own backend and its own history. The container saves its history to a Docker volume; dev keeps it in memory unless `HISTORY_FILE` is set in `backend.env`.
+There are two ways to run it, and they don't interfere with each other. Each has its own backend and its own history. The container saves its history to `/opt/docker/data/homelab-dashboard` on Titan; dev keeps it in memory unless `HISTORY_FILE` is set in `backend.env`.
 
 | | Container | Dev |
 |---|---|---|
@@ -225,7 +225,7 @@ docker compose up -d --build
 
 To deploy a new version: tag and push it, put its full commit hash in the compose file's `context` (`…dashboard.git#<hash>`) and its tag in `image`, commit and push that, copy the file over and rebuild. Old images stay tagged, so rolling back is putting the previous hash and tag back.
 
-The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, keeps metric history in the `history` volume (the only writable place besides `/tmp`), and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports, so the dashboard is reached only through Nginx Proxy Manager, which also provides the login.
+The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, keeps metric history in `/opt/docker/data/homelab-dashboard` (bind-mounted at `/data`, owned by uid 1000; the only writable place besides `/tmp`), and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports, so the dashboard is reached only through Nginx Proxy Manager, which also provides the login.
 
 **Login (Nginx Proxy Manager).** NPM asks for a password, and the backend makes sure that can't be skipped or abused (see [`requestGuards.ts`](backend/src/lib/requestGuards.ts)):
 
