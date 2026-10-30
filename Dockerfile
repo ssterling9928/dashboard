@@ -39,7 +39,7 @@ COPY --from=backend  /app/backend/dist  ./dist
 COPY --from=frontend /app/frontend/dist /app/public
 
 # Metric history is saved here (bind-mounted from the host in
-# docker-compose.yml; the host folder must be owned by uid 1000, "node").
+# docker-compose.yml, which also sets the uid the folder must be owned by).
 RUN mkdir /data && chown node:node /data
 
 USER node

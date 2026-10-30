@@ -23,10 +23,12 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    # Metric history, kept across redeploys and reboots. The folder must be
-    # owned by uid 1000 (the image's "node" user), or saving fails:
+    # Runs as 1026:1026 instead of the image's "node" user (1000). Metric
+    # history is kept across redeploys and reboots in a folder that must be
+    # owned by that same uid, or saving fails:
     #   sudo mkdir -p /opt/docker/data/homelab-dashboard
-    #   sudo chown 1000:1000 /opt/docker/data/homelab-dashboard
+    #   sudo chown 1026:1026 /opt/docker/data/homelab-dashboard
+    user: "1026:1026"
     volumes:
       - /opt/docker/data/homelab-dashboard:/data
     cap_drop:
