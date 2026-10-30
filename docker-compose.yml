@@ -8,10 +8,10 @@
 services:
   dashboard:
     build:
-      context: https://github.com/ssterling9928/dashboard.git#9fd215d6c8a875fb07bd30144b74710def6da6fb   # v1.0.3
+      context: https://github.com/ssterling9928/dashboard.git#d16a44cfa9e40d97ca38a3cb07bcfad6a77116a3   # v1.0.4
       args:
         VITE_GRAFANA_URL: https://grafana.home.sterling-dev.com   # optional
-    image: homelab-dashboard:v1.0.3   # older versions stay around for rollback
+    image: homelab-dashboard:v1.0.4   # older versions stay around for rollback
     container_name: homelab-dashboard
     restart: unless-stopped
     env_file: ./backend.env           # secrets live beside this file, not in the repo
