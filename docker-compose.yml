@@ -8,7 +8,7 @@
 services:
   dashboard:
     build:
-      context: https://github.com/ssterling9928/dashboard.git#d16a44cfa9e40d97ca38a3cb07bcfad6a77116a3   # v1.0.4
+      context: https://github.com/ssterling9928/dashboard.git#7bbaa9e91fe89665a8a2a152051a4391bb79d2ac   # v1.0.4
       # Site-specific values come from a .env file beside this one (compose
       # reads it automatically), so they stay out of the repo:
       #   VITE_GRAFANA_URL=https://grafana.example.com
