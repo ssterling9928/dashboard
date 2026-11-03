@@ -41,7 +41,7 @@ const raw = {
   },
   Mounts: [{ Type: 'bind', Source: '/opt/docker/data/grafana', Destination: '/var/lib/grafana', Mode: 'rw', RW: true, Propagation: 'rprivate' }],
   NetworkSettings: {
-    Networks: { private: { IPAddress: '172.18.0.7', Gateway: '172.18.0.1', MacAddress: '02:42:ac:12:00:07', Aliases: ['grafana'], DriverOpts: null } },
+    Networks: { private: { IPAddress: '172.17.0.7', Gateway: '172.17.0.1', MacAddress: '02:42:ac:11:00:07', Aliases: ['grafana'], DriverOpts: null } },
   },
 }
 
@@ -82,7 +82,7 @@ describe('sanitizeInspect', () => {
         PortBindings: { '3000/tcp': [{ HostIp: '', HostPort: '3000' }] },
       },
       Mounts: [{ Type: 'bind', Source: '/opt/docker/data/grafana', Destination: '/var/lib/grafana', Mode: 'rw', RW: true }],
-      Networks: { private: { IPAddress: '172.18.0.7', Aliases: ['grafana'] } },
+      Networks: { private: { IPAddress: '172.17.0.7', Aliases: ['grafana'] } },
     })
     expect(out.Mounts[0]).not.toHaveProperty('Propagation')
     expect(out.Networks.private).not.toHaveProperty('DriverOpts')

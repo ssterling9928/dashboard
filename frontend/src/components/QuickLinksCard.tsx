@@ -1,10 +1,13 @@
 // QuickLinksCard Component
-// Links from config/quickLinks.ts, opened in a new tab
+// Links from VITE_QUICK_LINKS (see config/quickLinks.ts), opened in a new tab.
+// Hidden when none are set.
 
 import { ExternalLink } from 'lucide-react'
 import { QUICK_LINKS } from '../config/quickLinks'
 
 export default function QuickLinksCard() {
+  if (QUICK_LINKS.length === 0) return null
+
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Quick Links</h3>

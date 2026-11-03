@@ -10,9 +10,11 @@ COPY shared/ shared/
 COPY frontend/package.json frontend/package-lock.json frontend/.npmrc frontend/
 RUN cd frontend && npm ci
 COPY frontend/ frontend/
-# Built into the JavaScript, so it's a build argument, not a runtime setting.
-# Optional: without it the Grafana buttons are hidden.
+# Built into the JavaScript, so these are build arguments, not runtime
+# settings. Both optional: without them the Grafana buttons and the Quick
+# Links card are hidden.
 ARG VITE_GRAFANA_URL
+ARG VITE_QUICK_LINKS
 RUN cd frontend && npm run build
 
 # ── Backend build ─────────────────────────────────────────

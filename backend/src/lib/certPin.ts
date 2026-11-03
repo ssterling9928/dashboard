@@ -2,8 +2,8 @@ import type { TLSSocket } from 'node:tls'
 import { buildConnector } from 'undici'
 
 // Accepts a SHA-256 fingerprint as openssl or a browser shows it
-// ("99:BF:5B:…", any case, with or without colons) and returns it in the
-// form Node reports ("99:BF:5B:…"), or null if it isn't one.
+// ("AB:CD:EF:…", any case, with or without colons) and returns it in the
+// form Node reports ("AB:CD:EF:…"), or null if it isn't one.
 export function normalizeFingerprint(value: string): string | null {
   const hex = value.replace(/[:\s]/g, '').toUpperCase()
   if (!/^[0-9A-F]{64}$/.test(hex)) return null

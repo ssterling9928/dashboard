@@ -8,7 +8,7 @@ import { X509Certificate } from 'node:crypto'
 import { fetch, Agent } from 'undici'
 import { normalizeFingerprint, pinnedConnector } from './certPin.js'
 
-const FP = '99:BF:5B:8C:C4:3D:60:01:5D:24:84:5C:21:B6:20:EB:E3:1F:62:44:C7:A9:E4:8D:4D:F2:C2:86:7D:96:74:07'
+const FP = 'AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89'
 
 describe('normalizeFingerprint', () => {
   it('keeps the openssl / Node form', () => {
@@ -22,7 +22,7 @@ describe('normalizeFingerprint', () => {
   it('rejects empty, short, and non-hex values', () => {
     expect(normalizeFingerprint('')).toBeNull()
     expect(normalizeFingerprint(FP.slice(0, -3))).toBeNull()
-    expect(normalizeFingerprint(FP.replace('99', 'ZZ'))).toBeNull()
+    expect(normalizeFingerprint(FP.replace('AB', 'ZZ'))).toBeNull()
   })
 })
 

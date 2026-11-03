@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     // Fixed timezone so date formatting is deterministic
-    env: { TZ: 'America/Chicago' },
+    env: { TZ: 'UTC' },
   },
   resolve: {
     alias: {

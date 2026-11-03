@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     // Fixed timezone so timestamp formatting is deterministic
-    env: { TZ: 'America/Chicago' },
+    env: { TZ: 'UTC' },
   },
 })

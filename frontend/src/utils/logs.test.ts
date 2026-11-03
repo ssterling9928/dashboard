@@ -21,7 +21,7 @@ describe('collapseRepeats', () => {
   })
 
   it('collapses a run of identical lines into one group, keeping the newest entry', () => {
-    const burst = Array.from({ length: 30 }, () => log('User [Stephen] logged in via [SSH].'))
+    const burst = Array.from({ length: 30 }, () => log('User [admin] logged in via [SSH].'))
     const groups = collapseRepeats(burst)
     expect(groups).toHaveLength(1)
     expect(groups[0]!.count).toBe(30)

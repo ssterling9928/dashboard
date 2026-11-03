@@ -28,7 +28,7 @@ describe('fetchFailureReason', () => {
   })
 
   it('passes the certificate pin message through', () => {
-    const cause = new Error('Certificate fingerprint mismatch for 10.0.0.30: got AA:BB')
+    const cause = new Error('Certificate fingerprint mismatch for 192.0.2.10: got AA:BB')
     expect(fetchFailureReason(new TypeError('fetch failed', { cause }), 10000)).toMatch(/fingerprint mismatch/)
   })
 })

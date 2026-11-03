@@ -110,7 +110,7 @@ describe.skipIf(!hasOpenssl)('synoRequest against a fake DSM', () => {
 
   async function loadClient(env: Record<string, string> = {}) {
     vi.stubEnv('SYNO_HOST', url)
-    vi.stubEnv('SYNO_USER', 'dashboard-api')
+    vi.stubEnv('SYNO_USER', 'monitor')
     vi.stubEnv('SYNO_PASS', 'pw')
     vi.stubEnv('SYNO_CERT_SHA256', fingerprint)
     for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v)

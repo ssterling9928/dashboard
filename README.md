@@ -123,7 +123,7 @@ dashboard/
 ├── backend/
 │   └── src/
 │       ├── server.ts              # Express app and route mounting
-│       ├── config/appLinks.ts     # which containers have a web app, and its subdomain
+│       ├── config/appLinks.ts     # which containers have a web app (APP_DOMAIN, APP_LINKS)
 │       ├── routes/
 │       │   ├── services.ts        # containers on both hosts, plus start/stop/restart
 │       │   ├── metrics.ts         # 30s poller, 24h buffers, ranges and downsampling
@@ -151,7 +151,7 @@ dashboard/
 │           ├── historyStore.ts    # saves and restores metric history (HISTORY_FILE)
 │           ├── containers.ts      # maps both helpers' docker output to services
 │       ├── utils/                 # formatting, log collapsing, saved ranges, theme (unit-tested)
-│       └── config/                # sidebar quick links, API base URL
+│       └── config/                # sidebar quick links (VITE_QUICK_LINKS), API base URL
 ├── shared/
 │   └── types.ts                   # API data shapes shared by both sides
 ├── scripts/dev.sh                 # dev mode: backend and Vite together
@@ -214,18 +214,28 @@ There are two ways to run it, and they don't interfere with each other. Each has
 
 ```bash
 # in the repo: release a version
+TZ=<area/city>                  # optional; log timestamps in local time (default UTC)
+APP_DOMAIN=home.example.com     # optional; containers listed in APP_LINKS get an "Open App" link
+APP_LINKS=grafana,portainer,vs-code-editor=code   # container names, "=subdomain" when it differs
+```
+
+**Frontend settings** are built into the page. Both are optional; without them the Grafana buttons and the Quick Links card are hidden. Put them in `frontend/.env` for dev, and in a `.env` beside `docker-compose.yml` for the container (compose passes them as build arguments):
+
+```env
+VITE_GRAFANA_URL=https://grafana.example.com
+VITE_QUICK_LINKS="Grafana|https://grafana.example.com,Portainer|https://portainer.example.com"
 git tag v1.0.3 && git push origin main v1.0.3
 git rev-parse v1.0.3          # the full hash goes in the compose file's build context
 
 # on Titan
-cd /opt/docker/compose/homelab-dashboard   # docker-compose.yml (copied from the repo) + backend.env
+cd /opt/docker/compose/homelab-dashboard   # docker-compose.yml (copied from the repo), backend.env, .env
 chmod 600 backend.env
 docker compose up -d --build
 ```
 
 To deploy a new version: tag and push it, put its full commit hash in the compose file's `context` (`…dashboard.git#<hash>`) and its tag in `image`, commit and push that, copy the file over and rebuild. Old images stay tagged, so rolling back is putting the previous hash and tag back.
 
-The compose file reads `backend.env` from its own folder, passes the Grafana URL as a build argument, sets the time zone, runs the container read-only with no Linux capabilities, keeps metric history in `/opt/docker/data/homelab-dashboard` (bind-mounted at `/data`; the container runs as `1026:1026` and the folder must be owned by it; the only writable place besides `/tmp`), and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports, so the dashboard is reached only through Nginx Proxy Manager, which also provides the login.
+The compose file reads `backend.env` from its own folder, passes the frontend settings from `.env` as build arguments, runs the container read-only with no Linux capabilities, keeps metric history in `/opt/docker/data/homelab-dashboard` (bind-mounted at `/data`; the container runs as `1026:1026` and the folder must be owned by it; the only writable place besides `/tmp`), and joins the existing `private_titan` Docker network so the dashboard can reach Loki and the Titan helper. It publishes no ports, so the dashboard is reached only through Nginx Proxy Manager, which also provides the login.
 
 **Login (Nginx Proxy Manager).** NPM asks for a password, and the backend makes sure that can't be skipped or abused (see [`requestGuards.ts`](backend/src/lib/requestGuards.ts)):
 
@@ -294,8 +304,8 @@ SYNO_HELPER_READ_TOKEN=<openssl rand -hex 32>   # optional; GET only, for dev
 The parts most likely to hide bugs are kept as pure functions and unit-tested with **Vitest**: the alert rules and every threshold boundary, the metric range selection and downsampling, inspect sanitizing (with planted secrets), the Docker, syslog and SNMP parsers, and the frontend's log collapsing, formatting and theme selection.
 
 ```bash
-cd backend  && npm test     # 102 tests
-cd frontend && npm test     # 20 tests
+cd backend  && npm test     # 105 tests
+cd frontend && npm test     # 23 tests
 npm test                    # both, from the repo root
 ```
 

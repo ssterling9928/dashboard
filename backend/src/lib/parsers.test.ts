@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { parseAppLinks } from '../config/appLinks.js'
 import {
   buildServiceUrl,
   formatTimestamp,
@@ -72,30 +73,52 @@ describe('splitServiceId', () => {
 
   it('rejects ids without a host or with an unknown host', () => {
     expect(() => splitServiceId('grafana')).toThrow('Invalid service id')
-    expect(() => splitServiceId('atlas:grafana')).toThrow('Unknown host')
+    expect(() => splitServiceId('nas:grafana')).toThrow('Unknown host')
   })
 })
 
 describe('buildServiceUrl', () => {
+  const links = parseAppLinks('home.example.com', 'grafana, vs-code-editor=code, it-tools=tools')
+
   it('links apps whose subdomain matches the container name', () => {
-    expect(buildServiceUrl('grafana')).toBe('https://grafana.home.sterling-dev.com')
+    expect(buildServiceUrl('grafana', links)).toBe('https://grafana.home.example.com')
   })
 
   it('uses the configured subdomain when it differs from the name', () => {
-    expect(buildServiceUrl('vs-code-editor')).toBe('https://code.home.sterling-dev.com')
-    expect(buildServiceUrl('it-tools')).toBe('https://tools.home.sterling-dev.com')
-    expect(buildServiceUrl('service-status-frontend')).toBe('https://docker.home.sterling-dev.com')
+    expect(buildServiceUrl('vs-code-editor', links)).toBe('https://code.home.example.com')
+    expect(buildServiceUrl('it-tools', links)).toBe('https://tools.home.example.com')
   })
 
   it('returns null for containers without a web app, including unlisted ones', () => {
-    for (const name of ['loki', 'node-exporter', 'portainer_agent', 'service-status-backend', 'brand-new-container']) {
-      expect(buildServiceUrl(name)).toBeNull()
+    for (const name of ['loki', 'node-exporter', 'brand-new-container']) {
+      expect(buildServiceUrl(name, links)).toBeNull()
     }
   })
 
   it('does not treat built-in object keys as container names', () => {
-    expect(buildServiceUrl('constructor')).toBeNull()
-    expect(buildServiceUrl('toString')).toBeNull()
+    expect(buildServiceUrl('constructor', links)).toBeNull()
+    expect(buildServiceUrl('toString', links)).toBeNull()
+  })
+
+  it('links nothing without a domain', () => {
+    expect(buildServiceUrl('grafana', parseAppLinks('', 'grafana'))).toBeNull()
+  })
+})
+
+describe('parseAppLinks', () => {
+  it('skips malformed entries and lowercases subdomains', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { domain, subdomains } = parseAppLinks(' Home.Example.com ', 'a=App, ,bad name, x=evil.com/path, y=-no')
+    expect(domain).toBe('home.example.com')
+    expect([...subdomains]).toEqual([['a', 'app']])
+    expect(warn).toHaveBeenCalledTimes(3)
+    warn.mockRestore()
+  })
+
+  it('rejects a domain that is not a hostname', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(parseAppLinks('evil.com/x?', 'grafana').domain).toBe('')
+    warn.mockRestore()
   })
 })
 
@@ -113,8 +136,8 @@ describe('parseLevel', () => {
 })
 
 describe('formatTimestamp', () => {
-  // vitest.config.ts pins TZ=America/Chicago (CDT is UTC-5 in October)
+  // vitest.config.ts pins TZ=UTC
   it('formats as "YYYY-MM-DD HH:MM:SS" in local time, like DSM', () => {
-    expect(formatTimestamp(Date.UTC(2026, 9, 22, 17, 45, 55))).toBe('2026-10-22 12:45:55')
+    expect(formatTimestamp(Date.UTC(2026, 9, 22, 17, 45, 55))).toBe('2026-10-22 17:45:55')
   })
 })

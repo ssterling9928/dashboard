@@ -35,7 +35,7 @@ function fail(message: string): never {
 
 if (!Number.isInteger(PORT) || PORT <= 0) fail('SYNO_HELPER_PORT must be set')
 if (!HOST || HOST === '0.0.0.0' || HOST === '::') {
-  fail('SYNO_HELPER_HOST must be the NAS\'s LAN address (e.g. 10.0.0.30), not every interface')
+  fail('SYNO_HELPER_HOST must be the NAS\'s LAN address (e.g. 192.168.1.10), not every interface')
 }
 if (!TLS_CERT || !TLS_KEY) fail('SYNO_HELPER_TLS_CERT and SYNO_HELPER_TLS_KEY must point to the certificate and key files')
 if (TOKEN.length < MIN_TOKEN_LENGTH) {

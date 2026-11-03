@@ -7,24 +7,24 @@ import {
   formatUptime,
 } from './format'
 
-// vitest.config.ts pins TZ=America/Chicago; 19:35Z is 2:35 PM CDT
+// vitest.config.ts pins TZ=UTC
 const TIME = '2026-10-21T19:35:00.000Z'
 
 describe('chart time formatting', () => {
   it('always shows hours and minutes on the axis', () => {
-    expect(formatTick(TIME, 'en-US')).toBe('2:35 PM')
+    expect(formatTick(TIME, 'en-US')).toBe('7:35 PM')
   })
 
   it('gives readings within the same hour distinct axis labels', () => {
-    // Regression: with hour-only labels, an hour of data on the 24h range read "3 PM" on every tick
+    // Regression: with hour-only labels, an hour of data on the 24h range read "8 PM" on every tick
     const labels = ['2026-10-21T20:05:00Z', '2026-10-21T20:25:00Z', '2026-10-21T20:45:00Z']
       .map(t => formatTick(t, 'en-US'))
     expect(new Set(labels).size).toBe(3)
-    expect(labels).toEqual(['3:05 PM', '3:25 PM', '3:45 PM'])
+    expect(labels).toEqual(['8:05 PM', '8:25 PM', '8:45 PM'])
   })
 
   it('shows weekday, date and time in the tooltip', () => {
-    expect(formatTooltipLabel(TIME, 'en-US')).toBe('Wed, Oct 21, 2:35 PM')
+    expect(formatTooltipLabel(TIME, 'en-US')).toBe('Wed, Oct 21, 7:35 PM')
   })
 })
 

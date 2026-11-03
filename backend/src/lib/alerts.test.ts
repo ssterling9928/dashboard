@@ -98,11 +98,11 @@ describe('containerAlerts', () => {
   it('warns about every container that is not running', () => {
     const alerts = containerAlerts([
       service('grafana', 'running', 'titan'),
-      service('sonarr', 'exited', 'titan'),
+      service('webapp', 'exited', 'titan'),
       service('node-exporter', 'paused', 'synology'),
     ])
     expect(alerts.map(a => [a.severity, a.title, a.detail])).toEqual([
-      ['warning', 'sonarr is exited', 'Container on Titan'],
+      ['warning', 'webapp is exited', 'Container on Titan'],
       ['warning', 'node-exporter is paused', 'Container on Vault'],
     ])
   })
