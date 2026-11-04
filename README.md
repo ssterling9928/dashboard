@@ -16,7 +16,12 @@ A single-page dashboard for my homelab. It shows the containers, metrics, logs a
 
 Each host is reached a different way, and the backend combines them all into one consistent API. The React frontend shows the result as one dashboard, which works on both desktop and mobile.
 
-<!-- Screenshots: see docs/screenshots/ (added separately) -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/desktop-dark.png">
+  <img src="docs/screenshots/desktop-light.png" alt="Homelab Monitoring dashboard: stat cards for both hosts, the Containers or Monitoring tab, and the system status sidebar">
+</picture>
+
+<sub>The screenshot follows your GitHub theme: light mode shows the Containers tab, dark mode the Monitoring tab.</sub>
 
 ---
 
@@ -133,6 +138,8 @@ dashboard/
 │       └── lib/
 │           ├── alerts.ts          # alert rules and thresholds (pure, unit-tested)
 │           ├── metricMath.ts      # range selection, downsampling, summaries (pure, unit-tested)
+│           ├── historyStore.ts    # saves and restores metric history (HISTORY_FILE)
+│           ├── containers.ts      # maps both helpers' docker output to services
 │           ├── inspect.ts         # allow-listed docker inspect for the Inspect view (pure, unit-tested)
 │           ├── parsers.ts         # Docker, syslog and timestamp parsers (pure, unit-tested)
 │           ├── synology.ts        # DSM Web API client with session refresh (Vault logs)
@@ -148,8 +155,6 @@ dashboard/
 │       ├── pages/Dashboard.tsx
 │       ├── components/            # cards, tabs, charts, modals, badges
 │       ├── hooks/                 # TanStack Query hooks for each endpoint
-│           ├── historyStore.ts    # saves and restores metric history (HISTORY_FILE)
-│           ├── containers.ts      # maps both helpers' docker output to services
 │       ├── utils/                 # formatting, log collapsing, saved ranges, theme (unit-tested)
 │       └── config/                # sidebar quick links (VITE_QUICK_LINKS), API base URL
 ├── shared/
@@ -199,6 +204,16 @@ TITAN_HELPER_URL=http://<docker-gateway-ip>:4222
 TITAN_HELPER_TOKEN=<token>      # the helper's full token in production, its read-only token in dev
 LOKI_URL=http://loki:3100
 PROXY_SECRET=<openssl rand -hex 32>   # production only; the same value goes in NPM (see Login below)
+TZ=<area/city>                  # optional; log timestamps in local time (default UTC)
+APP_DOMAIN=home.example.com     # optional; containers listed in APP_LINKS get an "Open App" link
+APP_LINKS=grafana,portainer,vs-code-editor=code   # container names, "=subdomain" when it differs
+```
+
+**Frontend settings** are built into the page. Both are optional; without them the Grafana buttons and the Quick Links card are hidden. Put them in `frontend/.env` for dev, and in a `.env` beside `docker-compose.yml` for the container (compose passes them as build arguments):
+
+```env
+VITE_GRAFANA_URL=https://grafana.example.com
+VITE_QUICK_LINKS="Grafana|https://grafana.example.com,Portainer|https://portainer.example.com"
 ```
 
 There are two ways to run it, and they don't interfere with each other. Each has its own backend and its own history. The container saves its history to `/opt/docker/data/homelab-dashboard` on Titan; dev keeps it in memory unless `HISTORY_FILE` is set in `backend.env`.
@@ -214,16 +229,6 @@ There are two ways to run it, and they don't interfere with each other. Each has
 
 ```bash
 # in the repo: release a version
-TZ=<area/city>                  # optional; log timestamps in local time (default UTC)
-APP_DOMAIN=home.example.com     # optional; containers listed in APP_LINKS get an "Open App" link
-APP_LINKS=grafana,portainer,vs-code-editor=code   # container names, "=subdomain" when it differs
-```
-
-**Frontend settings** are built into the page. Both are optional; without them the Grafana buttons and the Quick Links card are hidden. Put them in `frontend/.env` for dev, and in a `.env` beside `docker-compose.yml` for the container (compose passes them as build arguments):
-
-```env
-VITE_GRAFANA_URL=https://grafana.example.com
-VITE_QUICK_LINKS="Grafana|https://grafana.example.com,Portainer|https://portainer.example.com"
 git tag v1.0.3 && git push origin main v1.0.3
 git rev-parse v1.0.3          # the full hash goes in the compose file's build context
 
@@ -295,6 +300,7 @@ SYNO_HELPER_TLS_CERT=<path>/helper-cert.pem
 SYNO_HELPER_TLS_KEY=<path>/helper-key.pem
 SYNO_HELPER_TOKEN=<openssl rand -hex 32>        # required; full access, for the production dashboard
 SYNO_HELPER_READ_TOKEN=<openssl rand -hex 32>   # optional; GET only, for dev
+DOCKER_PATH=/usr/local/bin/docker               # optional; Container Manager's docker CLI (the default)
 ```
 
 ---
@@ -310,7 +316,6 @@ npm test                    # both, from the repo root
 ```
 
 ---
-DOCKER_PATH=/usr/local/bin/docker               # optional; Container Manager's docker CLI (the default)
 
 ## Roadmap
 
