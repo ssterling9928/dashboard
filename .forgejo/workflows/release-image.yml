@@ -1,0 +1,55 @@
+# Builds the dashboard image and pushes it to Forgejo's container registry
+# (git.home.sterling-dev.com/stephen/homelab-dashboard) when a version tag (v1.2.3)
+# is pushed. homelab-gitops pins that tag (plus digest) in docker/homelab-dashboard,
+# and Renovate opens the bump PR there.
+# Runs on the self-hosted Forgejo runner.
+#
+# Repo settings → Actions:
+#   Secrets:   REGISTRY_USERNAME (your Forgejo username)
+#              REGISTRY_TOKEN    (Forgejo PAT with package: read and write)
+#   (Forgejo reserves secret names starting with FORGEJO_/GITEA_/GITHUB_.)
+#   Variables: VITE_GRAFANA_URL, VITE_QUICK_LINKS (baked into the frontend; optional)
+name: release image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:            # rebuild a tag by hand: pick it under "Use workflow from"
+
+env:
+  REGISTRY: git.home.sterling-dev.com
+  IMAGE: git.home.sterling-dev.com/stephen/homelab-dashboard   # registry paths are lowercase
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Full URLs: bare names would resolve against Forgejo's DEFAULT_ACTIONS_URL, not GitHub
+      - uses: https://github.com/actions/checkout@v7
+
+      - uses: https://github.com/docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+
+      - id: meta
+        uses: https://github.com/docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=tag
+          flavor: |
+            latest=false
+
+      - uses: https://github.com/docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64      # titan is x86_64
+          pull: true
+          push: true
+          build-args: |
+            VITE_GRAFANA_URL=${{ vars.VITE_GRAFANA_URL }}
+            VITE_QUICK_LINKS=${{ vars.VITE_QUICK_LINKS }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
